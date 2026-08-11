@@ -1,0 +1,2 @@
+"timestamp","elapsed_sec","free_ram_mb","pagefile_mb","gpu_used_mb","gpu_free_mb","gpu_temp_c","proc_alive","proc_ws_mb","killed_reason"
+"2026-08-09 07:28:28","2","8032.1","163","1054","4913","58","False","0",""
