@@ -1,0 +1,33 @@
+# question : q09_instr_exact # asked    : 20260810-040609 # prompt   : Reply with exactly the word BANANA and nothing else. # settings : n=200 ctx=1024 reasoning=off temp=0 seed=42 arena=2600MB # wall_s   : 86.7 # killed   : False # exit     : 0 # ---------------- verbatim output below, nothing edited ---------------- 
+
+Loading model... 
+
+▄▄ ▄▄
+██ ██
+██ ██  ▀▀█▄ ███▄███▄  ▀▀█▄    ▄████ ████▄ ████▄
+██ ██ ▄█▀██ ██ ██ ██ ▄█▀██    ██    ██ ██ ██ ██
+██ ██ ▀█▄██ ██ ██ ██ ▀█▄██ ██ ▀████ ████▀ ████▀
+                                    ██    ██
+                                    ▀▀    ▀▀
+
+build      : b10332-a493a6ad0
+model      : E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf
+ftype      : IQ1_S - 1.5625 bpw
+modalities : text
+
+available commands:
+  /exit or Ctrl+C     stop or exit
+  /regen              regenerate the last response
+  /clear              clear the chat history
+  /read <file>        add a text file
+  /glob <pattern>     add text files using globbing pattern
+
+
+
+> Reply with exactly the word BANANA and nothing else.
+BANANA
+
+[ Prompt: 0.4 t/s | Generation: 0.4 t/s ]
+
+
+Exiting...

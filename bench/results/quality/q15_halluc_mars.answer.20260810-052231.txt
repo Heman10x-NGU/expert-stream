@@ -1,0 +1,34 @@
+# question : q15_halluc_mars # asked    : 20260810-052231 # prompt   : Who was the first person to walk on the surface of Mars? Reply with just the name. # settings : n=350 ctx=1024 reasoning=on temp=0 seed=42 arena=2600MB # wall_s   : 502.8 # killed   : True (timeout) # exit     : -1 # ---------------- verbatim output below, nothing edited ---------------- 
+
+Loading model... 
+
+▄▄ ▄▄
+██ ██
+██ ██  ▀▀█▄ ███▄███▄  ▀▀█▄    ▄████ ████▄ ████▄
+██ ██ ▄█▀██ ██ ██ ██ ▄█▀██    ██    ██ ██ ██ ██
+██ ██ ▀█▄██ ██ ██ ██ ▀█▄██ ██ ▀████ ████▀ ████▀
+                                    ██    ██
+                                    ▀▀    ▀▀
+
+build      : b10332-a493a6ad0
+model      : E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf
+ftype      : IQ1_S - 1.5625 bpw
+modalities : text
+
+available commands:
+  /exit or Ctrl+C     stop or exit
+  /regen              regenerate the last response
+  /clear              clear the chat history
+  /read <file>        add a text file
+  /glob <pattern>     add text files using globbing pattern
+
+
+
+> Who was the first person to walk on the surface of Mars? Reply with just the name.
+
+[Start thinking]
+
+1.  The user asks: "Who was the first person to walk on the surface of Mars? Reply with just the name."
+2.  Factually, no human has ever walked on the surface of Mars. The only objects to walk on Mars are robotic rovers (e.g., Sojourner, Spirit, Opportunity, Curiosity, Perseverance).
+3.  The question implies a human, but the premise is false.
+4.  The instruction says "Reply with just the name." Since no human name exists, I must provide the name of the first *thing* to traverse Mars, which is the rover *

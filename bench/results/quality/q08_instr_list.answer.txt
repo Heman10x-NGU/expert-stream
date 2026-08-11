@@ -1,0 +1,35 @@
+# question : q08_instr_list # asked    : 20260810-042034 # prompt   : List exactly three fruits, one per line, with no other text. # settings : n=200 ctx=1024 reasoning=off temp=0 seed=42 arena=2600MB # wall_s   : 102.2 # killed   : False # exit     : 0 # ---------------- verbatim output below, nothing edited ---------------- 
+
+Loading model... 
+
+▄▄ ▄▄
+██ ██
+██ ██  ▀▀█▄ ███▄███▄  ▀▀█▄    ▄████ ████▄ ████▄
+██ ██ ▄█▀██ ██ ██ ██ ▄█▀██    ██    ██ ██ ██ ██
+██ ██ ▀█▄██ ██ ██ ██ ▀█▄██ ██ ▀████ ████▀ ████▀
+                                    ██    ██
+                                    ▀▀    ▀▀
+
+build      : b10332-a493a6ad0
+model      : E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf
+ftype      : IQ1_S - 1.5625 bpw
+modalities : text
+
+available commands:
+  /exit or Ctrl+C     stop or exit
+  /regen              regenerate the last response
+  /clear              clear the chat history
+  /read <file>        add a text file
+  /glob <pattern>     add text files using globbing pattern
+
+
+
+> List exactly three fruits, one per line, with no other text.
+apple
+banana
+cherry
+
+[ Prompt: 0.4 t/s | Generation: 0.4 t/s ]
+
+
+Exiting...
