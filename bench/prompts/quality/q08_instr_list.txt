@@ -1,0 +1,1 @@
+List exactly three fruits, one per line, with no other text.

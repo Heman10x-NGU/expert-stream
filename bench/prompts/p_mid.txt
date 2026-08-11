@@ -1,0 +1,1 @@
+The history of computing hardware spans a long period. Early mechanical calculators gave way to electronic machines built from vacuum tubes, then transistors, then integrated circuits. Each transition reduced cost and size while increasing speed, and each one made a previously impractical class of problem routine to solve.

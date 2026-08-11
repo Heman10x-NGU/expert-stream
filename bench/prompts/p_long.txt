@@ -1,0 +1,7 @@
+The history of computing hardware spans a long period. Early mechanical calculators gave way to electronic machines built from vacuum tubes, then transistors, then integrated circuits. Each transition reduced cost and size while increasing speed, and each one made a previously impractical class of problem routine to solve.
+
+Memory hierarchies developed alongside processors. A register is fast and tiny, a cache is larger and slower, main memory is larger still, and storage is enormous but slow. Good performance comes from arranging work so that most accesses land near the top of this hierarchy. When a working set does not fit, the system spends its time moving bytes rather than computing on them.
+
+Sparse models change this calculation. If only a small fraction of a network's parameters participate in any single step, the remaining parameters need not be resident at all. They can live on storage and be fetched on demand. Whether that is fast enough depends entirely on how much reuse exists between consecutive steps, because reuse is what a cache converts into saved time.
+
+The engineering question is therefore not how quickly weights can be read, but how often reading them can be avoided altogether.

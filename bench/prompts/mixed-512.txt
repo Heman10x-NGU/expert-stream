@@ -1,0 +1,66 @@
+Mixture-of-experts models are unusual among large neural networks because only a small
+fraction of their parameters participate in producing any single token. A model with 284
+billion total parameters may activate only a few billion of them per step, which is what
+makes it plausible to run such a model on hardware that could never hold it in memory all at
+once. The catch is that the subset changes every token, and it changes per layer, so the
+system must fetch new weights continuously rather than loading once and reusing.
+
+This has a direct consequence for storage. If the weights live on an SSD rather than in RAM,
+then every token requires reading the experts that token routed to, and the read cannot begin
+until the router has decided. The router cannot decide until the previous layer has finished.
+So the naive implementation alternates between computing and waiting, and the waiting
+dominates by an order of magnitude.
+
+def route(hidden_state, gate_weights, top_k=6):
+    logits = hidden_state @ gate_weights.T
+    probs = softmax(logits)
+    experts = argsort(probs)[-top_k:]
+    weights = probs[experts]
+    return experts, weights / weights.sum()
+
+class ExpertCache:
+    def __init__(self, capacity_bytes):
+        self.capacity = capacity_bytes
+        self.resident = {}
+        self.used = 0
+
+    def get(self, layer, expert):
+        key = (layer, expert)
+        if key in self.resident:
+            self.hits += 1
+            return self.resident[key]
+        self.misses += 1
+        blob = self.read_from_disk(layer, expert)
+        self.insert(key, blob)
+        return blob
+
+    def evict_until(self, needed):
+        while self.used + needed > self.capacity:
+            victim = self.pick_victim()
+            self.used -= len(self.resident.pop(victim))
+
+The interesting question is which victim to pick. Belady's algorithm proves that the optimal
+choice is the item whose next use is furthest in the future, but that requires knowing the
+future, so every practical policy approximates it using the past instead. Least recently used
+assumes recency predicts reuse. Least frequently used assumes popularity predicts reuse.
+Both are guesses about what is coming, derived from what has already happened.
+
+There is a way to do better in this specific setting. Because consecutive transformer layers
+share a residual stream, the hidden state entering layer L is highly similar to the hidden
+state entering layer L plus one. That similarity means a router can be evaluated early, on a
+slightly stale input, and still produce nearly the correct answer. If all the routers are
+evaluated at the start of the token rather than one at a time, the system obtains an
+approximate list of every expert the token will need, before it has read a single byte.
+
+That list serves two purposes at once. First, it allows every read to be issued immediately,
+so the storage device receives a deep queue of requests instead of a trickle of six. Second,
+it tells the cache which experts are about to be needed and roughly when, which is precisely
+the information Belady's algorithm requires. The prediction is not perfect, but a cache
+policy does not need perfect information to beat a heuristic built on no information at all.
+
+The remaining difficulty is honesty about measurement. A benchmark that reads a small file
+measures the drive's internal cache rather than its flash. A benchmark that runs immediately
+after a large write measures garbage collection rather than steady-state throughput. A
+speedup measured once is not a speedup. The discipline that matters is reporting the median
+of several runs together with the spread, stating the hardware, and publishing the ideas that
+failed alongside the ones that worked, with the number that killed each one.
