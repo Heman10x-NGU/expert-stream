@@ -1,0 +1,575 @@
+From a493a6ad0738833adc5d5559871c49905c5d12ec Mon Sep 17 00:00:00 2001
+From: Hemant Kumar <heman10x@gmail.com>
+Date: Sun, 9 Aug 2026 21:37:52 +0530
+Subject: [PATCH 2/3] local: stream MoE experts off disk with real queue depth
+
+Local research fork only. Not upstream, no PR intended.
+
+When a MoE model is far larger than RAM, llama.cpp reaches routed experts through
+the mmap of the GGUF shard, so every byte arrives as a 4 KB page fault. A page
+fault is by construction blocking and one-at-a-time, and measured on this machine
+the mmap path behaves exactly like a queue-depth-1 reader: 469 MB/s at QD 1
+versus 717-801 MB/s at QD 2+, on identical bytes.
+
+expert-stream.c issues all of a layer's expert reads at once with
+FILE_FLAG_NO_BUFFERING | FILE_FLAG_OVERLAPPED and hands ggml pointers into its
+own arena. The hook goes in ggml_compute_forward_mul_mat_id because
+matrix_row_counts there is already the exact list of experts the call will use,
+and it is complete before any expert byte is touched - the information needed to
+fill the disk queue is simply sitting one barrier earlier than the reads it could
+be driving. Tensors are matched by name against the manifest, so nothing is
+plumbed through the loader.
+
+Measured against the same prompt, cap and binary: 126.6 s -> 115.9 s wall, prompt
+0.2 -> 0.3 t/s, 11,286 reads totalling 24.07 GiB, ZERO failed reads and ZERO
+arena-full fallbacks, and greedy output identical to the mmap path. The zero
+failures are the point of this stage: the manifest offsets, the sector-slop
+arithmetic and the 32-byte alignment are all correct.
+
+A DEADLOCK IS FIXED HERE AND THE SHAPE OF IT MATTERS. The first version
+initialised lazily, setting g_init = -1 pessimistically on entry. This function
+runs on every thread in the pool, and the call site uses the result to decide
+whether to execute an extra ggml_barrier(). Threads calling during the init
+window saw -1, answered "not an expert", and skipped the barrier while the
+initialising thread took it - so one thread waited at a barrier its peers would
+never reach. It presented as slow I/O: a 6 GB working set and 1.65 GB of reads,
+which is what streaming is supposed to look like. What exposed it was CPU time,
++0.0 s over 12 s, when seven threads on a spin barrier should have burned ~84 s.
+InitOnceExecuteOnce now blocks every caller until init completes so all threads
+observe the same state and take the same branch. Control flow around a barrier
+must be identical on every thread.
+
+Deliberately does NOT cache: every expert is re-read on every use, so the
+queue-depth effect is measured with one cause. Caching is the next stage and is
+worth far more, but it means gigabytes of dirty private memory on a machine where
+the model is 5x RAM, which deserves its own change.
+
+Every failure path returns NULL and the caller falls back to the ordinary mmap
+pointer, so a mis-parsed manifest, a failed read, a short read or a full arena
+costs speed and never correctness. Off entirely unless V4F_EXPERT_MANIFEST is set.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ ggml/src/ggml-cpu/CMakeLists.txt  |   2 +
+ ggml/src/ggml-cpu/expert-stream.c | 359 ++++++++++++++++++++++++++++++
+ ggml/src/ggml-cpu/expert-stream.h |  74 ++++++
+ ggml/src/ggml-cpu/ggml-cpu.c      |  32 +++
+ 4 files changed, 467 insertions(+)
+ create mode 100644 ggml/src/ggml-cpu/expert-stream.c
+ create mode 100644 ggml/src/ggml-cpu/expert-stream.h
+
+diff --git a/ggml/src/ggml-cpu/CMakeLists.txt b/ggml/src/ggml-cpu/CMakeLists.txt
+index 836bae4d0..d2d65fdf4 100644
+--- a/ggml/src/ggml-cpu/CMakeLists.txt
++++ b/ggml/src/ggml-cpu/CMakeLists.txt
+@@ -29,6 +29,8 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
+     list (APPEND GGML_CPU_SOURCES
+         ggml-cpu/ggml-cpu.c
+         ggml-cpu/ggml-cpu.cpp
++        ggml-cpu/expert-stream.c
++        ggml-cpu/expert-stream.h
+         ggml-cpu/repack.cpp
+         ggml-cpu/repack.h
+         ggml-cpu/hbm.cpp
+diff --git a/ggml/src/ggml-cpu/expert-stream.c b/ggml/src/ggml-cpu/expert-stream.c
+new file mode 100644
+index 000000000..8a82ea7ad
+--- /dev/null
++++ b/ggml/src/ggml-cpu/expert-stream.c
+@@ -0,0 +1,359 @@
++// expert-stream.c - see expert-stream.h for what this is and why.
++//
++// LOCAL RESEARCH FORK ONLY. Not upstream, no PR intended.
++
++#include "expert-stream.h"
++#include "ggml.h"
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#if !defined(_WIN32)
++
++// Everything here is Win32 overlapped unbuffered I/O. On other platforms the
++// module compiles to no-ops so the call sites need no #ifdef.
++bool ggml_expert_stream_active(void) { return false; }
++bool ggml_expert_stream_is_expert(const struct ggml_tensor * t) { (void) t; return false; }
++void ggml_expert_stream_begin(const struct ggml_tensor * t) { (void) t; }
++bool ggml_expert_stream_request(int64_t e) { (void) e; return false; }
++void ggml_expert_stream_submit(void) { }
++const void * ggml_expert_stream_ptr(int64_t e) { (void) e; return NULL; }
++
++#else
++
++#include <windows.h>
++
++#define ES_MAX_SHARDS   8
++#define ES_MAX_ROWS   512
++#define ES_MAX_EXPERTS 1024   // slot_of[] is indexed by expert id
++#define ES_SECTOR     4096    // E: is logical 512 / physical 4096; 4096 satisfies both
++
++// ---------------------------------------------------------------------------
++// manifest
++// ---------------------------------------------------------------------------
++
++struct es_row {
++    char    name[80];      // reconstructed tensor name, e.g. blk.7.ffn_down_exps.weight
++    int     shard_idx;
++    int64_t base_offset;
++    int64_t stride;
++    int     n_expert;
++};
++
++struct es_shard {
++    char   path[MAX_PATH];
++    HANDLE h;
++    int64_t size;
++};
++
++struct es_slot {
++    OVERLAPPED     ov;
++    unsigned char *buf;
++    HANDLE         h;      // handle the read was issued on; completions are unordered
++    int64_t        slop;   // offset of the wanted data inside buf
++    int64_t        want;   // useful bytes
++    DWORD          len;    // aligned bytes submitted
++    int64_t        expert; // which expert this slot holds
++    int            ok;     // read completed with enough bytes
++};
++
++static struct es_shard g_shard[ES_MAX_SHARDS];
++static int             g_nshard;
++static struct es_row   g_row[ES_MAX_ROWS];
++static int             g_nrow;
++
++static int             g_init;      // 0 not tried, 1 active, -1 disabled
++static struct es_slot *g_slot;
++static int             g_nslot;
++static size_t          g_slot_bytes;
++
++// Per-batch state. Only ever touched by the single thread that calls begin/
++// request/submit, and only read by other threads after a barrier.
++static const struct es_row *g_cur_row;
++static int32_t              g_slot_of[ES_MAX_EXPERTS];
++static int                  g_pending;
++
++// stats
++static int64_t g_stat_reads, g_stat_bytes, g_stat_fallback, g_stat_failed;
++
++static void es_report(void) {
++    if (g_init != 1) {
++        return;
++    }
++    fprintf(stderr,
++            "expert-stream: %lld reads, %.2f GiB, %lld arena-full fallbacks, %lld failed reads\n",
++            (long long) g_stat_reads, g_stat_bytes / 1073741824.0,
++            (long long) g_stat_fallback, (long long) g_stat_failed);
++}
++
++static void es_disable(const char * why) {
++    // Disabling is always safe: every caller falls back to src0->data, which is
++    // the mmap pointer that worked before this module existed.
++    fprintf(stderr, "expert-stream: DISABLED (%s) - falling back to mmap\n", why);
++    g_init = -1;
++}
++
++static int64_t es_round_dn(int64_t v, int64_t a) { return v - (v % a); }
++static int64_t es_round_up(int64_t v, int64_t a) { return ((v + a - 1) / a) * a; }
++
++// THREAD SAFETY - THIS CAUSED A REAL DEADLOCK, DO NOT SIMPLIFY.
++//
++// ggml_compute_forward_mul_mat_id runs on every thread in the pool, and the call
++// site uses ggml_expert_stream_is_expert() to decide whether to execute an extra
++// ggml_barrier(). Control flow around a barrier MUST be identical on every
++// thread: if one thread takes the barrier and another skips it, the first waits
++// forever for a peer that has already moved on.
++//
++// The first version initialised lazily with a plain `if (g_init != 0) return;`
++// and set g_init = -1 pessimistically on entry. Threads that called during that
++// window saw -1, answered "not an expert", and skipped the barrier while the
++// initialising thread took it. Symptom: the whole process at 0.0 s of CPU with
++// a 6 GB working set, looking exactly like slow I/O rather than a hang.
++//
++// InitOnceExecuteOnce makes every thread block until initialisation is complete,
++// so all of them observe the same final g_init and therefore the same branch.
++static INIT_ONCE g_once = INIT_ONCE_STATIC_INIT;
++
++static void es_init_locked(void) {
++    g_init = -1;   // pessimistic until everything below succeeds
++
++    const char * manifest = getenv("V4F_EXPERT_MANIFEST");
++    if (!manifest || !*manifest) {
++        return;    // not configured: silent, this is the normal case upstream
++    }
++
++    FILE * f = fopen(manifest, "r");
++    if (!f) {
++        fprintf(stderr, "expert-stream: cannot open V4F_EXPERT_MANIFEST '%s'\n", manifest);
++        return;
++    }
++
++    char line[1024];
++    int seen_header = 0;
++    g_nshard = 0;
++    g_nrow   = 0;
++    while (fgets(line, sizeof line, f)) {
++        if (line[0] == '#') {
++            int idx; char p[MAX_PATH];
++            // Field width is mandatory: an unbounded %[^\n] would overrun p.
++            if (sscanf(line, "#S %d %259[^\n\r]", &idx, p) == 2) {
++                if (idx < 0 || idx >= ES_MAX_SHARDS) { fclose(f); es_disable("shard index out of range"); return; }
++                size_t plen = strlen(p);
++                if (plen >= MAX_PATH)               { fclose(f); es_disable("shard path too long");     return; }
++                memcpy(g_shard[idx].path, p, plen + 1);
++                if (idx + 1 > g_nshard) g_nshard = idx + 1;
++            }
++            continue;
++        }
++        if (!seen_header) { seen_header = 1; continue; }
++        if (line[0] == '\n' || line[0] == '\r' || line[0] == 0) continue;
++
++        int layer, shard_idx, n_expert;
++        char kind[32];
++        long long base, stride;
++        if (sscanf(line, "%d,%31[^,],%d,%lld,%lld,%d",
++                   &layer, kind, &shard_idx, &base, &stride, &n_expert) != 6) {
++            fclose(f); es_disable("malformed manifest row"); return;
++        }
++        if (g_nrow >= ES_MAX_ROWS)                       { fclose(f); es_disable("too many manifest rows");   return; }
++        if (shard_idx < 0 || shard_idx >= ES_MAX_SHARDS) { fclose(f); es_disable("bad shard_idx");            return; }
++        if (stride <= 0 || n_expert <= 0)                { fclose(f); es_disable("bad stride/n_expert");      return; }
++        if (n_expert > ES_MAX_EXPERTS)                   { fclose(f); es_disable("n_expert exceeds slot_of"); return; }
++        // The stride MUST be a whole number of sectors, otherwise neighbouring
++        // experts share a sector and cannot be addressed independently. This is
++        // measured to hold for this model; assert it rather than assume it.
++        if (stride % ES_SECTOR != 0)                     { fclose(f); es_disable("stride not sector-aligned"); return; }
++
++        struct es_row * r = &g_row[g_nrow];
++        snprintf(r->name, sizeof r->name, "blk.%d.ffn_%s_exps.weight", layer, kind);
++        r->shard_idx   = shard_idx;
++        r->base_offset = (int64_t) base;
++        r->stride      = (int64_t) stride;
++        r->n_expert    = n_expert;
++        g_nrow++;
++    }
++    fclose(f);
++
++    if (g_nshard == 0 || g_nrow == 0) { es_disable("manifest declared no shards or no rows"); return; }
++
++    // ---- open shards, read-only, unbuffered ----
++    for (int i = 0; i < g_nshard; i++) {
++        if (!g_shard[i].path[0]) { es_disable("manifest skipped a shard index"); return; }
++        g_shard[i].h = CreateFileA(g_shard[i].path, GENERIC_READ, FILE_SHARE_READ, NULL,
++                                   OPEN_EXISTING,
++                                   FILE_FLAG_NO_BUFFERING | FILE_FLAG_OVERLAPPED | FILE_FLAG_RANDOM_ACCESS,
++                                   NULL);
++        if (g_shard[i].h == INVALID_HANDLE_VALUE) { es_disable("CreateFile failed on a shard"); return; }
++        LARGE_INTEGER sz;
++        if (!GetFileSizeEx(g_shard[i].h, &sz))    { es_disable("GetFileSizeEx failed");         return; }
++        g_shard[i].size = sz.QuadPart;
++    }
++
++    // ---- arena ----
++    int64_t biggest = 0;
++    for (int i = 0; i < g_nrow; i++) if (g_row[i].stride > biggest) biggest = g_row[i].stride;
++    g_slot_bytes = (size_t) es_round_up(biggest + ES_SECTOR, 65536);
++
++    int arena_mb = 192;
++    const char * am = getenv("V4F_EXPERT_ARENA_MB");
++    if (am && *am) {
++        arena_mb = atoi(am);
++        // An arena big enough to matter is also big enough to hurt: this is
++        // private committed memory on a machine where the model is 5x RAM.
++        if (arena_mb < 32 || arena_mb > 1024) { es_disable("V4F_EXPERT_ARENA_MB outside 32..1024"); return; }
++    }
++
++    g_nslot = (int) (((size_t) arena_mb * 1024 * 1024) / g_slot_bytes);
++    if (g_nslot < 8) { es_disable("arena too small for 8 slots"); return; }
++
++    g_slot = (struct es_slot *) calloc((size_t) g_nslot, sizeof(struct es_slot));
++    if (!g_slot) { es_disable("out of memory for slot table"); return; }
++
++    for (int i = 0; i < g_nslot; i++) {
++        g_slot[i].buf = (unsigned char *) VirtualAlloc(NULL, g_slot_bytes,
++                                                       MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
++        g_slot[i].ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);   // manual reset
++        if (!g_slot[i].buf || !g_slot[i].ov.hEvent) { es_disable("arena allocation failed"); return; }
++    }
++
++    g_init = 1;
++    atexit(es_report);
++    fprintf(stderr, "expert-stream: ACTIVE - %d tensors, %d shards, %d slots x %zu bytes (%d MB arena)\n",
++            g_nrow, g_nshard, g_nslot, g_slot_bytes, arena_mb);
++}
++
++static BOOL CALLBACK es_init_once_cb(PINIT_ONCE once, PVOID param, PVOID * ctx) {
++    (void) once; (void) param; (void) ctx;
++    es_init_locked();
++    return TRUE;
++}
++
++static void es_init(void) {
++    // Blocks every caller until initialisation finishes, so all threads observe
++    // the same g_init and take the same branch at the call site. See the note
++    // above es_init_locked.
++    InitOnceExecuteOnce(&g_once, es_init_once_cb, NULL, NULL);
++}
++
++// ---------------------------------------------------------------------------
++// public API
++// ---------------------------------------------------------------------------
++
++bool ggml_expert_stream_active(void) {
++    es_init();
++    return g_init == 1;
++}
++
++static const struct es_row * es_find(const char * name) {
++    // Linear scan over ~129 rows, 3 times per layer. Against 1.6 GiB of I/O per
++    // token this is not measurable, and a hash map would be more code to get
++    // wrong for no gain.
++    for (int i = 0; i < g_nrow; i++) {
++        if (strcmp(g_row[i].name, name) == 0) return &g_row[i];
++    }
++    return NULL;
++}
++
++bool ggml_expert_stream_is_expert(const struct ggml_tensor * t) {
++    if (!ggml_expert_stream_active() || !t) return false;
++    return es_find(t->name) != NULL;
++}
++
++void ggml_expert_stream_begin(const struct ggml_tensor * t) {
++    g_cur_row = NULL;
++    g_pending = 0;
++    if (g_init != 1 || !t) return;
++    g_cur_row = es_find(t->name);
++    if (!g_cur_row) return;
++    for (int i = 0; i < ES_MAX_EXPERTS; i++) g_slot_of[i] = -1;
++}
++
++bool ggml_expert_stream_request(int64_t expert_id) {
++    if (g_init != 1 || !g_cur_row) return false;
++    if (expert_id < 0 || expert_id >= g_cur_row->n_expert) return false;
++    if (expert_id >= ES_MAX_EXPERTS) return false;
++    if (g_pending >= g_nslot) {
++        // Arena full. The caller reads this expert through the mmap instead,
++        // which is correct, just slower. Happens during prefill, where a single
++        // layer can route to far more experts than a decode step does.
++        g_stat_fallback++;
++        return false;
++    }
++
++    const struct es_row * r = g_cur_row;
++    const int64_t off   = r->base_offset + expert_id * r->stride;
++    const int64_t aoff  = es_round_dn(off, ES_SECTOR);
++    const int64_t slop  = off - aoff;
++    int64_t       alen  = es_round_up(slop + r->stride, ES_SECTOR);
++
++    // An unbuffered read may not run past the sector-rounded end of file.
++    const int64_t cap = es_round_up(g_shard[r->shard_idx].size, ES_SECTOR) - aoff;
++    if (alen > cap) alen = es_round_dn(cap, ES_SECTOR);
++    if (alen <= 0 || (size_t) alen > g_slot_bytes) { g_stat_fallback++; return false; }
++
++    struct es_slot * s = &g_slot[g_pending];
++    s->ov.Offset     = (DWORD) (aoff & 0xFFFFFFFF);
++    s->ov.OffsetHigh = (DWORD) (aoff >> 32);
++    ResetEvent(s->ov.hEvent);
++    s->h      = g_shard[r->shard_idx].h;
++    s->slop   = slop;
++    s->want   = r->stride;
++    s->len    = (DWORD) alen;
++    s->expert = expert_id;
++    s->ok     = 0;
++
++    BOOL rc = ReadFile(s->h, s->buf, (DWORD) alen, NULL, &s->ov);
++    if (!rc && GetLastError() != ERROR_IO_PENDING) {
++        g_stat_failed++;
++        return false;   // not queued; caller falls back
++    }
++
++    g_slot_of[expert_id] = g_pending;
++    g_pending++;
++    return true;
++}
++
++void ggml_expert_stream_submit(void) {
++    if (g_init != 1 || g_pending == 0) return;
++
++    // All reads are already outstanding - they were issued as they were
++    // requested, which is the entire point. This only collects them.
++    for (int i = 0; i < g_pending; i++) {
++        struct es_slot * s = &g_slot[i];
++        DWORD got = 0;
++        if (!GetOverlappedResult(s->h, &s->ov, &got, TRUE)) {
++            DWORD e = GetLastError();
++            if (e != ERROR_HANDLE_EOF) {
++                g_stat_failed++;
++                g_slot_of[s->expert] = -1;   // force fallback for this expert
++                continue;
++            }
++        }
++        if ((int64_t) got < s->slop + s->want) {
++            // Short read. Not enough bytes for the whole expert, so this slot
++            // cannot be used. Falling back is correct; using it would be silent
++            // corruption, which at IQ1_S reads as quantisation noise.
++            g_stat_failed++;
++            g_slot_of[s->expert] = -1;
++            continue;
++        }
++        s->ok = 1;
++        g_stat_reads++;
++        g_stat_bytes += got;
++    }
++}
++
++const void * ggml_expert_stream_ptr(int64_t expert_id) {
++    if (g_init != 1 || !g_cur_row) return NULL;
++    if (expert_id < 0 || expert_id >= ES_MAX_EXPERTS) return NULL;
++    const int32_t si = g_slot_of[expert_id];
++    if (si < 0 || si >= g_nslot) return NULL;
++    const struct es_slot * s = &g_slot[si];
++    if (!s->ok) return NULL;
++    // buf is page-aligned and slop is a multiple of 32 (GGUF aligns tensors to
++    // 32), so this pointer is 32-byte aligned and ggml's SIMD loads are fine.
++    return s->buf + s->slop;
++}
++
++#endif // _WIN32
+diff --git a/ggml/src/ggml-cpu/expert-stream.h b/ggml/src/ggml-cpu/expert-stream.h
+new file mode 100644
+index 000000000..3d77a582c
+--- /dev/null
++++ b/ggml/src/ggml-cpu/expert-stream.h
+@@ -0,0 +1,74 @@
++// expert-stream.h - stream MoE routed-expert weights from disk with real queue depth.
++//
++// LOCAL RESEARCH FORK ONLY. Not upstream, no PR intended.
++//
++// WHY THIS EXISTS
++// When a MoE model is far larger than RAM, llama.cpp reaches its expert weights
++// through the mmap of the GGUF shard. Every byte therefore arrives as a 4 KB page
++// fault, and a page fault is by construction blocking and one-at-a-time. Measured
++// on this machine, that behaves exactly like a queue-depth-1 reader:
++//
++//     mmap fault path                   ~330-469 MB/s
++//     explicit unbuffered reads, QD 1    469 MB/s
++//     explicit unbuffered reads, QD 2+   717-801 MB/s
++//
++// The gap is not alignment and not layout - both were measured and neither
++// mattered. It is purely that nothing ever has more than one read outstanding.
++//
++// This module issues ALL of a layer's expert reads at once with
++// FILE_FLAG_NO_BUFFERING | FILE_FLAG_OVERLAPPED, then hands ggml pointers into
++// its own arena instead of into the mmap.
++//
++// WHAT IT DOES NOT DO (yet)
++// It does not cache. Every expert is re-read every time it is used. That is
++// deliberate: it isolates the queue-depth effect so the measurement has one
++// cause. Caching is the next stage and is worth much more (88.9% of expert
++// accesses over 220 tokens are repeats), but it introduces gigabytes of dirty
++// private memory, which is a genuinely dangerous thing to add on a machine this
++// size and deserves its own change.
++//
++// SAFETY POSTURE
++// Every failure path falls back to the ordinary mmap pointer, which is always
++// valid. This module can be disabled, mis-configured, or fail at runtime and the
++// worst outcome is the original speed. It never returns a pointer it is not
++// certain about.
++//
++// ENABLED ONLY when the environment variable V4F_EXPERT_MANIFEST names a readable
++// manifest CSV. Unset, every function here is a cheap no-op.
++
++#pragma once
++
++#include <stdbool.h>
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++struct ggml_tensor;
++
++// True if streaming is configured and usable. Cheap after the first call.
++bool ggml_expert_stream_active(void);
++
++// True if this tensor is a routed-expert tensor the manifest knows how to address.
++// Cheap; safe to call on every mul_mat_id.
++bool ggml_expert_stream_is_expert(const struct ggml_tensor * t);
++
++// Begin a fetch batch for one expert tensor. Must be called by a single thread.
++void ggml_expert_stream_begin(const struct ggml_tensor * t);
++
++// Queue expert `expert_id` for reading. Returns false if the arena is full, in
++// which case the caller must fall back to the mmap pointer for that expert.
++bool ggml_expert_stream_request(int64_t expert_id);
++
++// Issue every queued read and wait for all of them. This is where queue depth
++// comes from: N reads outstanding at once rather than N sequential faults.
++void ggml_expert_stream_submit(void);
++
++// Pointer to expert `expert_id` inside the arena, or NULL if it was not fetched
++// (arena full, read failed, short read). NULL means "use src0->data as before".
++const void * ggml_expert_stream_ptr(int64_t expert_id);
++
++#ifdef __cplusplus
++}
++#endif
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
+index 491316f74..c8c95c072 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -14,6 +14,7 @@
+ #include "ops.h"
+ #include "ggml.h"
+ #include "common.h"
++#include "expert-stream.h"   // LOCAL FORK: disk streaming for routed MoE experts
+ 
+ #if defined(_MSC_VER) || defined(__MINGW32__)
+ #include <malloc.h> // using malloc.h with MSC/MINGW
+@@ -1644,6 +1645,31 @@ static void ggml_compute_forward_mul_mat_id(
+ 
+     ggml_barrier(params->threadpool);
+ 
++    // LOCAL FORK: stream this layer's routed experts off disk with real queue
++    // depth instead of letting them arrive as 4 KB page faults one at a time.
++    //
++    // This is the right place for it because matrix_row_counts above is already
++    // the exact list of experts this call will use, and it is complete before a
++    // single expert byte has been touched. So every read can be issued at once.
++    //
++    // No-op unless V4F_EXPERT_MANIFEST is set. Any failure returns NULL from
++    // _ptr below and the original mmap pointer is used, so the worst case is the
++    // speed we had before.
++    const bool es_on = ggml_expert_stream_is_expert(src0);
++    if (es_on) {
++        if (ith == 0) {
++            ggml_expert_stream_begin(src0);
++            for (int cur_a = 0; cur_a < n_as; ++cur_a) {
++                if (matrix_row_counts[cur_a] > 0) {
++                    ggml_expert_stream_request(cur_a);
++                }
++            }
++            ggml_expert_stream_submit();
++        }
++        // Every thread must see the completed reads before any of them computes.
++        ggml_barrier(params->threadpool);
++    }
++
+     for (int cur_a = 0; cur_a < n_as; ++cur_a) {
+         const int64_t cne1 = matrix_row_counts[cur_a];
+ 
+@@ -1652,6 +1678,12 @@ static void ggml_compute_forward_mul_mat_id(
+         }
+ 
+         const char * src0_cur = (const char *) src0->data + cur_a * nb02;
++        if (es_on) {
++            const void * streamed = ggml_expert_stream_ptr(cur_a);
++            if (streamed) {
++                src0_cur = (const char *) streamed;
++            }
++        }
+         const void * wdata = (src1->type == vec_dot_type) ? src1->data : params->wdata;
+         const size_t row_size = ggml_row_size(vec_dot_type, ne10);
+ 
