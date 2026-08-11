@@ -1,0 +1,296 @@
+====================================================================================================
+expert_spectrum.py -- low-rank-sketch kill-or-confirm experiment
+====================================================================================================
+model_dir            = E:\models\ds4f-iq1s\UD-IQ1_S
+gguf_py              = D:\2025_Cursor_Dev\V4-local-serving\llama.cpp\gguf-py
+layers               = 3
+experts_per_layer    = 2
+rank_list            = 8,16,32,64,128,256
+matrices             = gate,up,down
+seed                 = 42
+
+Found 3 shard(s):
+  E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf  (0.01 GB)
+  E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00002-of-00003.gguf  (49.09 GB)
+  E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00003-of-00003.gguf  (33.44 GB)
+
+Opening shards (metadata only, memmap -- this does not load tensor data into RAM)...
+  opened DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf in 6.88s, 0 tensors
+  opened DeepSeek-V4-Flash-0731-UD-IQ1_S-00002-of-00003.gguf in 0.05s, 812 tensors
+  opened DeepSeek-V4-Flash-0731-UD-IQ1_S-00003-of-00003.gguf in 0.04s, 516 tensors
+Indexed 129 routed-expert tensors across shards.
+
+MoE layers present: 43 (indices 0..42)
+Experts per layer (from tensor shape): 256
+
+Dequantization support check PASSED for all quant types we will touch:
+  IQ3_XXS: supported
+  IQ1_S: supported
+  IQ2_XXS: supported
+  MXFP4: supported
+
+Sampling plan: 3 layer(s) x up to 2 expert(s) = 6 expert(s) total
+  layers  : [0, 21, 42]
+    layer   0 (early): experts [12, 57]
+    layer  21 (mid  ): experts [125, 140]
+    layer  42 (late ): experts [71, 114]
+
+[1/18] layer=  0 expert= 12 matrix=gate qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.13s  svd[exact]=6.43s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0136          0.0112    0.0025          49152         33.333
+        16        0.0260          0.0220    0.0040          98304         16.667
+        32        0.0499          0.0432    0.0067         196608          8.333
+        64        0.0948          0.0837    0.0111         393216          4.167
+       128        0.1769          0.1590    0.0178         786432          2.083
+       256        0.3180          0.2921    0.0259        1572864          1.042
+    rank-for-90%energy: real=1309 (0.6392 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1550 (0.7568 of full rank)  random=1591 (0.7769 of full rank)
+    rank-for-99%energy: real=1879 (0.9175 of full rank)  random=1899 (0.9272 of full rank)
+
+[2/18] layer=  0 expert= 12 matrix=up   qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.11s  svd[exact]=5.61s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0124          0.0111    0.0013          49152         33.333
+        16        0.0245          0.0220    0.0025          98304         16.667
+        32        0.0478          0.0432    0.0047         196608          8.333
+        64        0.0921          0.0837    0.0084         393216          4.167
+       128        0.1733          0.1590    0.0143         786432          2.083
+       256        0.3139          0.2922    0.0217        1572864          1.042
+    rank-for-90%energy: real=1314 (0.6416 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1553 (0.7583 of full rank)  random=1592 (0.7773 of full rank)
+    rank-for-99%energy: real=1881 (0.9185 of full rank)  random=1899 (0.9272 of full rank)
+
+[3/18] layer=  0 expert= 12 matrix=down qtype=IQ3_XXS    -- dequantizing...
+    shape=(4096,2048) full_rank=2048 orig_quant_bytes=3211264 (3.211 MB)  dequant=0.16s  svd[exact]=5.70s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0113          0.0112    0.0001          49152         65.333
+        16        0.0223          0.0221    0.0002          98304         32.667
+        32        0.0436          0.0433    0.0004         196608         16.333
+        64        0.0843          0.0837    0.0006         393216          8.167
+       128        0.1599          0.1590    0.0008         786432          4.083
+       256        0.2932          0.2922    0.0010        1572864          2.042
+    rank-for-90%energy: real=1359 (0.6636 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1591 (0.7769 of full rank)  random=1591 (0.7769 of full rank)
+    rank-for-99%energy: real=1898 (0.9268 of full rank)  random=1898 (0.9268 of full rank)
+
+[4/18] layer=  0 expert= 57 matrix=gate qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.09s  svd[exact]=5.57s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0136          0.0111    0.0024          49152         33.333
+        16        0.0260          0.0220    0.0040          98304         16.667
+        32        0.0500          0.0431    0.0068         196608          8.333
+        64        0.0950          0.0836    0.0114         393216          4.167
+       128        0.1771          0.1589    0.0183         786432          2.083
+       256        0.3185          0.2919    0.0266        1572864          1.042
+    rank-for-90%energy: real=1309 (0.6392 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1549 (0.7563 of full rank)  random=1591 (0.7769 of full rank)
+    rank-for-99%energy: real=1879 (0.9175 of full rank)  random=1899 (0.9272 of full rank)
+
+[5/18] layer=  0 expert= 57 matrix=up   qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.11s  svd[exact]=5.64s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0125          0.0112    0.0013          49152         33.333
+        16        0.0246          0.0221    0.0025          98304         16.667
+        32        0.0479          0.0432    0.0047         196608          8.333
+        64        0.0922          0.0837    0.0085         393216          4.167
+       128        0.1735          0.1590    0.0145         786432          2.083
+       256        0.3143          0.2922    0.0221        1572864          1.042
+    rank-for-90%energy: real=1313 (0.6411 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1553 (0.7583 of full rank)  random=1592 (0.7773 of full rank)
+    rank-for-99%energy: real=1881 (0.9185 of full rank)  random=1898 (0.9268 of full rank)
+
+[6/18] layer=  0 expert= 57 matrix=down qtype=IQ3_XXS    -- dequantizing...
+    shape=(4096,2048) full_rank=2048 orig_quant_bytes=3211264 (3.211 MB)  dequant=0.16s  svd[exact]=5.41s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0113          0.0112    0.0001          49152         65.333
+        16        0.0223          0.0221    0.0002          98304         32.667
+        32        0.0436          0.0432    0.0003         196608         16.333
+        64        0.0842          0.0837    0.0005         393216          8.167
+       128        0.1596          0.1589    0.0006         786432          4.083
+       256        0.2927          0.2921    0.0007        1572864          2.042
+    rank-for-90%energy: real=1359 (0.6636 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1591 (0.7769 of full rank)  random=1591 (0.7769 of full rank)
+    rank-for-99%energy: real=1898 (0.9268 of full rank)  random=1899 (0.9272 of full rank)
+
+[7/18] layer= 21 expert=125 matrix=gate qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.11s  svd[exact]=5.63s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0321          0.0112    0.0209          49152         33.333
+        16        0.0531          0.0221    0.0311          98304         16.667
+        32        0.0872          0.0432    0.0439         196608          8.333
+        64        0.1425          0.0838    0.0587         393216          4.167
+       128        0.2320          0.1591    0.0730         786432          2.083
+       256        0.3724          0.2922    0.0803        1572864          1.042
+    rank-for-90%energy: real=1276 (0.623 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1526 (0.7451 of full rank)  random=1592 (0.7773 of full rank)
+    rank-for-99%energy: real=1870 (0.9131 of full rank)  random=1899 (0.9272 of full rank)
+
+[8/18] layer= 21 expert=125 matrix=up   qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.11s  svd[exact]=5.54s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0213          0.0111    0.0102          49152         33.333
+        16        0.0370          0.0220    0.0149          98304         16.667
+        32        0.0645          0.0432    0.0213         196608          8.333
+        64        0.1136          0.0837    0.0299         393216          4.167
+       128        0.1990          0.1589    0.0400         786432          2.083
+       256        0.3398          0.2920    0.0478        1572864          1.042
+    rank-for-90%energy: real=1303 (0.6362 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1547 (0.7554 of full rank)  random=1591 (0.7769 of full rank)
+    rank-for-99%energy: real=1879 (0.9175 of full rank)  random=1899 (0.9272 of full rank)
+
+[9/18] layer= 21 expert=125 matrix=down qtype=IQ3_XXS    -- dequantizing...
+    shape=(4096,2048) full_rank=2048 orig_quant_bytes=3211264 (3.211 MB)  dequant=0.16s  svd[exact]=5.68s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0305          0.0111    0.0193          49152         65.333
+        16        0.0493          0.0220    0.0273          98304         32.667
+        32        0.0805          0.0432    0.0373         196608         16.333
+        64        0.1323          0.0837    0.0486         393216          8.167
+       128        0.2185          0.1590    0.0595         786432          4.083
+       256        0.3577          0.2921    0.0656        1572864          2.042
+    rank-for-90%energy: real=1288 (0.6289 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1536 (0.75 of full rank)  random=1591 (0.7769 of full rank)
+    rank-for-99%energy: real=1874 (0.915 of full rank)  random=1899 (0.9272 of full rank)
+
+[10/18] layer= 21 expert=140 matrix=gate qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.11s  svd[exact]=5.56s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0297          0.0112    0.0186          49152         33.333
+        16        0.0493          0.0220    0.0273          98304         16.667
+        32        0.0815          0.0432    0.0383         196608          8.333
+        64        0.1345          0.0837    0.0508         393216          4.167
+       128        0.2214          0.1590    0.0623         786432          2.083
+       256        0.3602          0.2921    0.0681        1572864          1.042
+    rank-for-90%energy: real=1292 (0.6309 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1539 (0.7515 of full rank)  random=1592 (0.7773 of full rank)
+    rank-for-99%energy: real=1876 (0.916 of full rank)  random=1899 (0.9272 of full rank)
+
+[11/18] layer= 21 expert=140 matrix=up   qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.11s  svd[exact]=5.69s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0166          0.0112    0.0055          49152         33.333
+        16        0.0312          0.0220    0.0092          98304         16.667
+        32        0.0580          0.0431    0.0149         196608          8.333
+        64        0.1062          0.0836    0.0226         393216          4.167
+       128        0.1906          0.1589    0.0317         786432          2.083
+       256        0.3311          0.2919    0.0393        1572864          1.042
+    rank-for-90%energy: real=1314 (0.6416 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1555 (0.7593 of full rank)  random=1592 (0.7773 of full rank)
+    rank-for-99%energy: real=1883 (0.9194 of full rank)  random=1899 (0.9272 of full rank)
+
+[12/18] layer= 21 expert=140 matrix=down qtype=IQ3_XXS    -- dequantizing...
+    shape=(4096,2048) full_rank=2048 orig_quant_bytes=3211264 (3.211 MB)  dequant=0.16s  svd[exact]=5.74s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0285          0.0112    0.0173          49152         65.333
+        16        0.0485          0.0220    0.0265          98304         32.667
+        32        0.0819          0.0432    0.0387         196608         16.333
+        64        0.1362          0.0837    0.0525         393216          8.167
+       128        0.2237          0.1590    0.0648         786432          4.083
+       256        0.3633          0.2921    0.0712        1572864          2.042
+    rank-for-90%energy: real=1284 (0.627 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1532 (0.748 of full rank)  random=1591 (0.7769 of full rank)
+    rank-for-99%energy: real=1872 (0.9141 of full rank)  random=1899 (0.9272 of full rank)
+
+[13/18] layer= 42 expert= 71 matrix=gate qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.11s  svd[exact]=5.62s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0292          0.0112    0.0181          49152         33.333
+        16        0.0433          0.0220    0.0212          98304         16.667
+        32        0.0676          0.0432    0.0243         196608          8.333
+        64        0.1109          0.0838    0.0271         393216          4.167
+       128        0.1884          0.1590    0.0293         786432          2.083
+       256        0.3218          0.2920    0.0298        1572864          1.042
+    rank-for-90%energy: real=1332 (0.6504 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1570 (0.7666 of full rank)  random=1591 (0.7769 of full rank)
+    rank-for-99%energy: real=1889 (0.9224 of full rank)  random=1899 (0.9272 of full rank)
+
+[14/18] layer= 42 expert= 71 matrix=up   qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.13s  svd[exact]=5.95s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0199          0.0112    0.0087          49152         33.333
+        16        0.0332          0.0220    0.0112          98304         16.667
+        32        0.0565          0.0432    0.0134         196608          8.333
+        64        0.0991          0.0837    0.0154         393216          4.167
+       128        0.1763          0.1590    0.0173         786432          2.083
+       256        0.3102          0.2922    0.0179        1572864          1.042
+    rank-for-90%energy: real=1343 (0.6558 of full rank)  random=1359 (0.6636 of full rank)
+    rank-for-95%energy: real=1578 (0.7705 of full rank)  random=1591 (0.7769 of full rank)
+    rank-for-99%energy: real=1893 (0.9243 of full rank)  random=1898 (0.9268 of full rank)
+
+[15/18] layer= 42 expert= 71 matrix=down qtype=MXFP4      -- dequantizing...
+    shape=(4096,2048) full_rank=2048 orig_quant_bytes=4456448 (4.456 MB)  dequant=0.13s  svd[exact]=5.33s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0157          0.0111    0.0046          49152         90.667
+        16        0.0275          0.0220    0.0055          98304         45.333
+        32        0.0497          0.0431    0.0066         196608         22.667
+        64        0.0916          0.0835    0.0081         393216         11.333
+       128        0.1686          0.1587    0.0098         786432          5.667
+       256        0.3032          0.2917    0.0114        1572864          2.833
+    rank-for-90%energy: real=1343 (0.6558 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1577 (0.77 of full rank)  random=1591 (0.7769 of full rank)
+    rank-for-99%energy: real=1891 (0.9233 of full rank)  random=1898 (0.9268 of full rank)
+
+[16/18] layer= 42 expert=114 matrix=gate qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.12s  svd[exact]=5.73s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0264          0.0111    0.0152          49152         33.333
+        16        0.0391          0.0220    0.0171          98304         16.667
+        32        0.0620          0.0432    0.0188         196608          8.333
+        64        0.1044          0.0836    0.0208         393216          4.167
+       128        0.1816          0.1589    0.0228         786432          2.083
+       256        0.3160          0.2920    0.0240        1572864          1.042
+    rank-for-90%energy: real=1330 (0.6494 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1567 (0.7651 of full rank)  random=1592 (0.7773 of full rank)
+    rank-for-99%energy: real=1888 (0.9219 of full rank)  random=1899 (0.9272 of full rank)
+
+[17/18] layer= 42 expert=114 matrix=up   qtype=IQ1_S      -- dequantizing...
+    shape=(2048,4096) full_rank=2048 orig_quant_bytes=1638400 (1.638 MB)  dequant=0.13s  svd[exact]=5.52s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0177          0.0112    0.0066          49152         33.333
+        16        0.0305          0.0220    0.0085          98304         16.667
+        32        0.0541          0.0432    0.0109         196608          8.333
+        64        0.0978          0.0837    0.0141         393216          4.167
+       128        0.1770          0.1589    0.0181         786432          2.083
+       256        0.3132          0.2919    0.0213        1572864          1.042
+    rank-for-90%energy: real=1334 (0.6514 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1571 (0.7671 of full rank)  random=1592 (0.7773 of full rank)
+    rank-for-99%energy: real=1889 (0.9224 of full rank)  random=1899 (0.9272 of full rank)
+
+[18/18] layer= 42 expert=114 matrix=down qtype=MXFP4      -- dequantizing...
+    shape=(4096,2048) full_rank=2048 orig_quant_bytes=4456448 (4.456 MB)  dequant=0.13s  svd[exact]=5.42s
+      rank   energy_real   energy_random       gap  sketch_int8_B  compression_x
+         8        0.0191          0.0111    0.0080          49152         90.667
+        16        0.0319          0.0220    0.0099          98304         45.333
+        32        0.0557          0.0431    0.0126         196608         22.667
+        64        0.1000          0.0836    0.0164         393216         11.333
+       128        0.1805          0.1588    0.0217         786432          5.667
+       256        0.3194          0.2919    0.0275        1572864          2.833
+    rank-for-90%energy: real=1306 (0.6377 of full rank)  random=1360 (0.6641 of full rank)
+    rank-for-95%energy: real=1544 (0.7539 of full rank)  random=1592 (0.7773 of full rank)
+    rank-for-99%energy: real=1874 (0.915 of full rank)  random=1899 (0.9272 of full rank)
+
+Done. Processed 18 matrices in 211.2s. CSV written to D:\2025_Cursor_Dev\V4-local-serving\v4flash-16gb\bench\results\expert_spectrum.csv
+
+====================================================================================================
+AGGREGATE SUMMARY (mean across all sampled matrices)
+====================================================================================================
+representative rank for headline numbers: r=64
+  mean energy@r=64   real=0.1062   random=0.0837   gap=+0.0225
+  mean rank-for-90%-energy as fraction of full rank: real=0.6431   random=0.6641
+  mean compression ratio at r=64 (int8 sketch bytes vs original quantized bytes): 5.852x
+
+Breakdown by matrix kind:
+  gate : n= 6  mean_gap@r64=+0.0300  mean_rank90_frac=0.6387
+  up   : n= 6  mean_gap@r64=+0.0165  mean_rank90_frac=0.6446
+  down : n= 6  mean_gap@r64=+0.0211  mean_rank90_frac=0.6461
+
+Breakdown by layer:
+  layer   0: n= 6  mean_gap@r64=+0.0068  mean_rank90_frac=0.6481
+  layer  21: n= 6  mean_gap@r64=+0.0439  mean_rank90_frac=0.6313
+  layer  42: n= 6  mean_gap@r64=+0.0170  mean_rank90_frac=0.6501
+
+====================================================================================================
+VERDICT
+====================================================================================================
+NOT LOW RANK: at rank 64, real expert matrices retain 10.6% of Frobenius energy on average, versus 8.4% for a random matrix of the same shape (gap = only 2.3 points, i.e. real spectrum is within 5 points of random). Reaching 90% energy needs 64.3% of full rank on average -- essentially the whole matrix. Kill the sketch tier.
+====================================================================================================

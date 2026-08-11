@@ -1,0 +1,225 @@
+
+==============================================================================
+hash_routing.py -- DeepSeek-V4-Flash-0731 hash-routed layers 0-2 analysis
+==============================================================================
+CAVEAT: layers 0-2 use FROZEN HASH ROUTING (token id -> expert lookup, zero dependence on hidden state). Layers 3-42 route on hidden state and are NOT covered here. This is the overlap curve for the 3 hash-routed layers ONLY -- it must never be presented as 'the expert overlap curve for V4-Flash'. It is a genuine partial result and a dry run of the methodology for the other 40 layers.
+python: 3.13.0 (tags/v3.13.0:60403a5, Oct  7 2024, 09:38:07) [MSC v.1941 64 bit (AMD64)]
+numpy: 2.2.6
+
+==============================================================================
+PART 1 - LOADING THE HASH-ROUTING TABLES AND DETERMINING SEMANTICS
+==============================================================================
+CAVEAT: layers 0-2 use FROZEN HASH ROUTING (token id -> expert lookup, zero dependence on hidden state). Layers 3-42 route on hidden state and are NOT covered here. This is the overlap curve for the 3 hash-routed layers ONLY -- it must never be presented as 'the expert overlap curve for V4-Flash'. It is a genuine partial result and a dry run of the methodology for the other 40 layers.
+
+model dir: E:\models\ds4f-iq1s\UD-IQ1_S
+shards found: ['DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf', 'DeepSeek-V4-Flash-0731-UD-IQ1_S-00002-of-00003.gguf', 'DeepSeek-V4-Flash-0731-UD-IQ1_S-00003-of-00003.gguf']
+tokenizer.ggml.tokens length (vocab, counted directly) = 129280
+metadata key ending '.vocab_size'                       = None -> None
+deepseek4.expert_count      (n_expert)                  = 256
+deepseek4.expert_used_count (n_expert_used, i.e. k)      = 6
+deepseek4.hash_layer_count                               = 3
+
+--- blk.0.ffn_gate_tid2eid.weight  (found in DeepSeek-V4-Flash-0731-UD-IQ1_S-00002-of-00003.gguf) ---
+  ggml shape (ne order, ne[0] fastest)  = [np.uint64(6), np.uint64(129280)]
+  numpy array shape (as loaded)         = (129280, 6)
+  dtype                                 = int32
+  n_elements                            = 775680  (tensor.n_elements = 775680)
+  min value                             = 0
+  max value                             = 255
+
+--- blk.1.ffn_gate_tid2eid.weight  (found in DeepSeek-V4-Flash-0731-UD-IQ1_S-00002-of-00003.gguf) ---
+  ggml shape (ne order, ne[0] fastest)  = [np.uint64(6), np.uint64(129280)]
+  numpy array shape (as loaded)         = (129280, 6)
+  dtype                                 = int32
+  n_elements                            = 775680  (tensor.n_elements = 775680)
+  min value                             = 0
+  max value                             = 255
+
+--- blk.2.ffn_gate_tid2eid.weight  (found in DeepSeek-V4-Flash-0731-UD-IQ1_S-00002-of-00003.gguf) ---
+  ggml shape (ne order, ne[0] fastest)  = [np.uint64(6), np.uint64(129280)]
+  numpy array shape (as loaded)         = (129280, 6)
+  dtype                                 = int32
+  n_elements                            = 775680  (tensor.n_elements = 775680)
+  min value                             = 0
+  max value                             = 255
+
+==============================================================================
+PART 1 - SEMANTICS DETERMINATION (evidence-based)
+==============================================================================
+numpy shapes for the 3 tables: {0: (129280, 6), 1: (129280, 6), 2: (129280, 6)}
+first dim (candidate: indexed by token id) per layer: {0: 129280, 1: 129280, 2: 129280}
+vocab size (from tokenizer.ggml.tokens)              : 129280
+  -> first dim == vocab_size for all 3 layers?  True
+second dim (candidate: number of experts per row) per layer: {0: 6, 1: 6, 2: 6}
+n_expert_used (k) from metadata                             : 6
+  -> second dim == n_expert_used (full top-k row)?  True
+  -> second dim == 1 (single expert, rest from elsewhere)?  False
+layer 0: value range [0, 255]  within [0, 255]? True
+layer 1: value range [0, 255]  within [0, 255]? True
+layer 2: value range [0, 255]  within [0, 255]? True
+layer 0: rows with within-row duplicate experts (sample of 5000 rows): 0 (0.00%)
+layer 1: rows with within-row duplicate experts (sample of 5000 rows): 0 (0.00%)
+layer 2: rows with within-row duplicate experts (sample of 5000 rows): 0 (0.00%)
+
+SEMANTICS CONCLUSION:
+  Each table has shape (vocab_size=129280, n_expert_used=6).
+  Row index = token id. Row contents = the FULL top-6 expert set for that token,
+  for that hash-routed layer. All values lie within [0, n_expert-1]. This is a
+  complete, self-sufficient token-id -> expert-set lookup; no other input is needed.
+  SEMANTICS ARE CONSISTENT. Proceeding to parts 2-5.
+
+==============================================================================
+PART 2 - TOKENIZING REAL TEXT (llama-tokenize.exe, shard 1 only, no weights loaded)
+==============================================================================
+tokenizer exe: E:\tools\llamacpp\llama-tokenize.exe
+model (shard 1, metadata-only, 5,257,664 bytes on disk): E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf
+
+--- english_prose ---
+  file: C:\Users\hemant\AppData\Local\Temp\claude\D--2025-Cursor-Dev-V4-local-serving\47e234c5-134d-4367-b077-bca7a21d4dbb\scratchpad\text_english.txt
+  description: Original English prose (narrative, ~900 tokens) describing the discovery of hash routing
+  token count: 913
+  first 12 ids: [2107, 344, 260, 8341, 62333, 30507, 396, 260, 2958, 28325, 295, 22294]
+
+--- python_source ---
+  file: C:\Users\hemant\AppData\Local\Temp\claude\D--2025-Cursor-Dev-V4-local-serving\47e234c5-134d-4367-b077-bca7a21d4dbb\scratchpad\text_python.py
+  description: Original Python source code (~1500 tokens): an LRU expert cache + hash-routing lookup demo module
+  token count: 1541
+  first 12 ids: [26712, 35, 2395, 2280, 112803, 12124, 19157, 260, 18585, 69361, 46360, 55]
+
+--- german_prose ---
+  file: C:\Users\hemant\AppData\Local\Temp\claude\D--2025-Cursor-Dev-V4-local-serving\47e234c5-134d-4367-b077-bca7a21d4dbb\scratchpad\text_german.txt
+  description: Original German prose (~1100 tokens), same narrative theme as the English text, translated
+  token count: 1116
+  first 12 ids: [16675, 6067, 9165, 119740, 16445, 14, 2464, 9005, 295, 2917, 95085, 13005]
+
+==============================================================================
+PART 3 - EXPERT OVERLAP CURVE, LAYERS 0-2 ONLY (hash-routed)
+==============================================================================
+CAVEAT: layers 0-2 use FROZEN HASH ROUTING (token id -> expert lookup, zero dependence on hidden state). Layers 3-42 route on hidden state and are NOT covered here. This is the overlap curve for the 3 hash-routed layers ONLY -- it must never be presented as 'the expert overlap curve for V4-Flash'. It is a genuine partial result and a dry run of the methodology for the other 40 layers.
+
+==============================================================================
+corpus: english_prose
+==============================================================================
+  sequence length (tokens): 913
+    N  mean_union   min   max  ratio_real  baseline_N  ratio_baseline
+    1      18.000    18    18      1.0000      18.000          1.0000
+    2      35.605    33    36      0.9890      35.578          0.9883
+    3      52.692    35    54      0.9758      52.744          0.9767
+    4      69.163    51    72      0.9606      69.508          0.9654
+    6     100.461    80   107      0.9302     101.866          0.9432
+    8     129.503    94   140      0.8993     132.725          0.9217
+   12     181.509   142   199      0.8403     190.221          0.8807
+   16     227.647   184   253      0.7904     242.513          0.8421
+
+==============================================================================
+corpus: python_source
+==============================================================================
+  sequence length (tokens): 1541
+    N  mean_union   min   max  ratio_real  baseline_N  ratio_baseline
+    1      18.000    18    18      1.0000      18.000          1.0000
+    2      35.602    33    36      0.9889      35.578          0.9883
+    3      52.650    34    54      0.9750      52.744          0.9767
+    4      69.146    51    72      0.9604      69.508          0.9654
+    6     100.421    68   108      0.9298     101.866          0.9432
+    8     129.159    68   141      0.8969     132.725          0.9217
+   12     179.721    97   203      0.8320     190.221          0.8807
+   16     224.337   122   255      0.7789     242.513          0.8421
+
+==============================================================================
+corpus: german_prose
+==============================================================================
+  sequence length (tokens): 1116
+    N  mean_union   min   max  ratio_real  baseline_N  ratio_baseline
+    1      18.000    18    18      1.0000      18.000          1.0000
+    2      35.571    18    36      0.9881      35.578          0.9883
+    3      52.675    35    54      0.9755      52.744          0.9767
+    4      69.314    51    72      0.9627      69.508          0.9654
+    6     101.384    69   107      0.9387     101.866          0.9432
+    8     131.752   102   141      0.9149     132.725          0.9217
+   12     187.400   145   203      0.8676     190.221          0.8807
+   16     237.451   189   260      0.8245     242.513          0.8421
+
+==============================================================================
+corpus: ALL_POOLED
+==============================================================================
+  pooled window-union values across all corpora above (windows never cross a text boundary)
+    N  mean_union   min   max  ratio_real  baseline_N  ratio_baseline
+    1      18.000    18    18      1.0000      18.000          1.0000
+    2      35.593    18    36      0.9887      35.578          0.9883
+    3      52.669    34    54      0.9753      52.744          0.9767
+    4      69.202    51    72      0.9611      69.508          0.9654
+    6     100.732    68   108      0.9327     101.866          0.9432
+    8     130.057    68   141      0.9032     132.725          0.9217
+   12     182.576    97   203      0.8453     190.221          0.8807
+   16     229.277   122   260      0.7961     242.513          0.8421
+
+CSV written: D:\2025_Cursor_Dev\V4-local-serving\v4flash-16gb\bench\results\hash_overlap_curve.csv
+
+==============================================================================
+PART 4 - SKEW / CONCENTRATION ACROSS (layer, expert) PAIRS
+==============================================================================
+CAVEAT: layers 0-2 use FROZEN HASH ROUTING (token id -> expert lookup, zero dependence on hidden state). Layers 3-42 route on hidden state and are NOT covered here. This is the overlap curve for the 3 hash-routed layers ONLY -- it must never be presented as 'the expert overlap curve for V4-Flash'. It is a genuine partial result and a dry run of the methodology for the other 40 layers.
+Corpus used: all three tokenized texts concatenated (raw token instances, not deduped).
+total token instances across all corpora: 3570
+total routing events counted (tokens * layers * k, allowing within-row dupes): 64260
+number of (layer,expert) slots: 768  ( = 3 layers * 256 experts)
+slots with at least one hit: 768 / 768  (100.0%)
+
+fraction of all routing events covered by top 10% of (layer,expert) slots: 20.40%  (uniform would give 10.00%)
+fraction of all routing events covered by top 25% of (layer,expert) slots: 40.23%  (uniform would give 25.00%)
+fraction of all routing events covered by top 50% of (layer,expert) slots: 65.82%  (uniform would give 50.00%)
+Gini coefficient of the (layer,expert) usage histogram: 0.2304  (0.0 = perfectly uniform, 1.0 = maximally concentrated)
+
+Per-layer breakdown:
+  layer 0: total_hits=21420  nonzero_experts=256/256  gini=0.2271
+  layer 1: total_hits=21420  nonzero_experts=256/256  gini=0.2217
+  layer 2: total_hits=21420  nonzero_experts=256/256  gini=0.2414
+
+==============================================================================
+PART 5 - CROSS-CHECK AGAINST SHIPPED HOTLIST (bench/results/hotlist_flash.json)
+==============================================================================
+CAVEAT: layers 0-2 use FROZEN HASH ROUTING (token id -> expert lookup, zero dependence on hidden state). Layers 3-42 route on hidden state and are NOT covered here. This is the overlap curve for the 3 hash-routed layers ONLY -- it must never be presented as 'the expert overlap curve for V4-Flash'. It is a genuine partial result and a dry run of the methodology for the other 40 layers.
+hotlist source: D:\2025_Cursor_Dev\V4-local-serving\ds4\ds4_streaming_hotlist.inc
+hotlist variant: flash  entry_count: 6436
+hotlist note: position in this array is the rank order used by ds4 at load time via priority = max_entries - loaded; no numeric hit-count/weight is stored in this file.
+
+--- layer 0 ---
+  our observed nonzero experts (this small corpus): 256 / 256
+  hotlist experts listed for this layer:            251 / 256
+  overlap (our nonzero AND in hotlist):             251
+  fraction of OUR nonzero experts also in hotlist:  98.0%
+  fraction of HOTLIST experts we also observed:     100.0%
+  our top-10 hottest experts (by hit count) : [106, 29, 132, 62, 74, 77, 107, 204, 156, 63]
+  their rank in the shipped hotlist (None = absent, lower rank = hotter overall): [599, 1701, 730, 1404, 1902, 1704, 1542, 1709, 2636, 1901]
+  our nonzero experts that are ABSENT from the hotlist entirely: 5 [33, 254, 47, 160, 12]
+
+--- layer 1 ---
+  our observed nonzero experts (this small corpus): 256 / 256
+  hotlist experts listed for this layer:            252 / 256
+  overlap (our nonzero AND in hotlist):             252
+  fraction of OUR nonzero experts also in hotlist:  98.4%
+  fraction of HOTLIST experts we also observed:     100.0%
+  our top-10 hottest experts (by hit count) : [114, 86, 229, 155, 210, 36, 42, 15, 35, 32]
+  their rank in the shipped hotlist (None = absent, lower rank = hotter overall): [1171, 1931, 1286, 1416, 1723, 1170, 4437, 2653, 2131, 1712]
+  our nonzero experts that are ABSENT from the hotlist entirely: 4 [16, 199, 194, 177]
+
+--- layer 2 ---
+  our observed nonzero experts (this small corpus): 256 / 256
+  hotlist experts listed for this layer:            254 / 256
+  overlap (our nonzero AND in hotlist):             254
+  fraction of OUR nonzero experts also in hotlist:  99.2%
+  fraction of HOTLIST experts we also observed:     100.0%
+  our top-10 hottest experts (by hit count) : [77, 74, 174, 162, 65, 141, 20, 125, 146, 195]
+  their rank in the shipped hotlist (None = absent, lower rank = hotter overall): [1948, 1175, 1732, 4465, 3871, 1092, 1174, 2420, 1568, 1734]
+  our nonzero experts that are ABSENT from the hotlist entirely: 2 [127, 232]
+
+Interpretation: layers 0-2's hash routing spreads token ids fairly evenly over the
+256-expert table (see PART 4 Gini). If the hotlist agrees, it independently confirms
+that these 3 layers do not have strongly 'hot' experts worth caching -- the hotlist's
+selectivity for these layers should be much weaker than for the hidden-state-routed
+layers 3-42.
+
+==============================================================================
+DONE
+==============================================================================
+CAVEAT: layers 0-2 use FROZEN HASH ROUTING (token id -> expert lookup, zero dependence on hidden state). Layers 3-42 route on hidden state and are NOT covered here. This is the overlap curve for the 3 hash-routed layers ONLY -- it must never be presented as 'the expert overlap curve for V4-Flash'. It is a genuine partial result and a dry run of the methodology for the other 40 layers.

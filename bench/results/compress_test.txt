@@ -1,0 +1,220 @@
+====================================================================================================
+compress_test.py -- Task 0.14 compression kill-or-confirm experiment
+====================================================================================================
+model_dir = E:\models\ds4f-iq1s\UD-IQ1_S
+gguf_py   = D:\2025_Cursor_Dev\V4-local-serving\llama.cpp\gguf-py
+seed      = 42
+
+zstandard: available (version 0.25.0)
+lz4: available
+zlib: available (stdlib)
+
+Found 3 shard(s):
+  E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf  (0.01 GB)
+  E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00002-of-00003.gguf  (49.09 GB)
+  E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00003-of-00003.gguf  (33.44 GB)
+
+Opening shards (metadata only, memmap -- this does not load tensor data into RAM)...
+  opened DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf in 6.41s, 0 tensors
+  opened DeepSeek-V4-Flash-0731-UD-IQ1_S-00002-of-00003.gguf in 0.18s, 812 tensors
+  opened DeepSeek-V4-Flash-0731-UD-IQ1_S-00003-of-00003.gguf in 0.04s, 516 tensors
+Indexed 129 routed-expert tensors across shards.
+
+Experts per routed-expert tensor (from tensor shape, axis 0): 256
+
+Quant types found among routed-expert tensors (live scan):
+  IQ1_S     : 60 tensor(s), layers [0, 2, 3, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 31, 34, 35, 36, 37, 38, 39, 41, 42]
+  IQ2_XXS   : 26 tensor(s), layers [1, 4, 5, 8, 9, 26, 27, 28, 29, 30, 32, 33, 40]
+  IQ3_XXS   : 41 tensor(s), layers [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41]
+  MXFP4     : 2 tensor(s), layers [26, 42]
+
+
+Sampling plan: 8 blob(s), covering 4 of 4 required quant types, 6 distinct layer(s)
+  layer=  0 kind=gate qtype=IQ1_S      expert=140  tensor=blk.0.ffn_gate_exps.weight
+  layer= 42 kind=gate qtype=IQ1_S      expert=125  tensor=blk.42.ffn_gate_exps.weight
+  layer=  1 kind=gate qtype=IQ2_XXS    expert= 52  tensor=blk.1.ffn_gate_exps.weight
+  layer= 40 kind=gate qtype=IQ2_XXS    expert= 44  tensor=blk.40.ffn_gate_exps.weight
+  layer=  0 kind=down qtype=IQ3_XXS    expert= 15  tensor=blk.0.ffn_down_exps.weight
+  layer= 41 kind=down qtype=IQ3_XXS    expert= 47  tensor=blk.41.ffn_down_exps.weight
+  layer= 26 kind=down qtype=MXFP4      expert= 13  tensor=blk.26.ffn_down_exps.weight
+  layer= 42 kind=down qtype=MXFP4      expert=101  tensor=blk.42.ffn_down_exps.weight
+
+Codecs under test: ['zstd-1', 'zstd-3', 'lz4', 'zlib-1']
+
+Byte-plane separation structural test will use codec: zstd-3
+
+====================================================================================================
+PER-BLOB RESULTS
+====================================================================================================
+[blob 0] layer=0 kind=gate qtype=IQ1_S expert=140 tensor=blk.0.ffn_gate_exps.weight
+  loaded 1638400 bytes (1.638 MB) from memmap in 0.019s (disk read time, NOT counted in codec timing)
+    [raw             ] zstd-1   ratio= 1.000x  comp=   718.4 MB/s  decomp=  4356.3 MB/s (4.356 GB/s, median of 9 reps)
+    [raw             ] zstd-3   ratio= 1.000x  comp=   605.6 MB/s  decomp=  3960.4 MB/s (3.960 GB/s, median of 9 reps)
+    [raw             ] lz4      ratio= 1.000x  comp=  1636.8 MB/s  decomp=  2475.7 MB/s (2.476 GB/s, median of 9 reps)
+    [raw             ] zlib-1   ratio= 1.000x  comp=    33.1 MB/s  decomp=  1110.4 MB/s (1.110 GB/s, median of 9 reps)
+    [random_control  ] zstd-1   ratio= 1.000x  comp=  2439.9 MB/s  decomp=  3684.3 MB/s (3.684 GB/s, median of 9 reps)
+    [random_control  ] zstd-3   ratio= 1.000x  comp=  2054.7 MB/s  decomp=  4392.5 MB/s (4.392 GB/s, median of 9 reps)
+    [random_control  ] lz4      ratio= 1.000x  comp=  1581.6 MB/s  decomp=  2198.6 MB/s (2.199 GB/s, median of 9 reps)
+    [random_control  ] zlib-1   ratio= 1.000x  comp=    34.0 MB/s  decomp=  1145.0 MB/s (1.145 GB/s, median of 9 reps)
+    [byteplane_N2    ] zstd-3   ratio= 1.000x  comp=   603.8 MB/s  decomp=  3604.0 MB/s (3.604 GB/s, median of 9 reps)
+    [byteplane_N4    ] zstd-3   ratio= 1.000x  comp=   674.1 MB/s  decomp=  3591.4 MB/s (3.591 GB/s, median of 9 reps)
+
+[blob 1] layer=42 kind=gate qtype=IQ1_S expert=125 tensor=blk.42.ffn_gate_exps.weight
+  loaded 1638400 bytes (1.638 MB) from memmap in 0.020s (disk read time, NOT counted in codec timing)
+    [raw             ] zstd-1   ratio= 1.000x  comp=   712.1 MB/s  decomp=  3235.4 MB/s (3.235 GB/s, median of 9 reps)
+    [raw             ] zstd-3   ratio= 1.000x  comp=   595.3 MB/s  decomp=  3858.7 MB/s (3.859 GB/s, median of 9 reps)
+    [raw             ] lz4      ratio= 1.000x  comp=  1631.7 MB/s  decomp=  2589.5 MB/s (2.590 GB/s, median of 9 reps)
+    [raw             ] zlib-1   ratio= 1.000x  comp=    33.5 MB/s  decomp=  1148.1 MB/s (1.148 GB/s, median of 9 reps)
+    [random_control  ] zstd-1   ratio= 1.000x  comp=  2349.6 MB/s  decomp=  4476.5 MB/s (4.477 GB/s, median of 9 reps)
+    [random_control  ] zstd-3   ratio= 1.000x  comp=  1883.4 MB/s  decomp=  3772.5 MB/s (3.773 GB/s, median of 9 reps)
+    [random_control  ] lz4      ratio= 1.000x  comp=  1457.4 MB/s  decomp=  2362.2 MB/s (2.362 GB/s, median of 9 reps)
+    [random_control  ] zlib-1   ratio= 1.000x  comp=    32.8 MB/s  decomp=  1146.2 MB/s (1.146 GB/s, median of 9 reps)
+    [byteplane_N2    ] zstd-3   ratio= 1.000x  comp=   831.0 MB/s  decomp=  3963.2 MB/s (3.963 GB/s, median of 9 reps)
+    [byteplane_N4    ] zstd-3   ratio= 1.000x  comp=   723.4 MB/s  decomp=  3983.5 MB/s (3.983 GB/s, median of 9 reps)
+
+[blob 2] layer=1 kind=gate qtype=IQ2_XXS expert=52 tensor=blk.1.ffn_gate_exps.weight
+  loaded 2162688 bytes (2.163 MB) from memmap in 0.021s (disk read time, NOT counted in codec timing)
+    [raw             ] zstd-1   ratio= 1.000x  comp=   702.3 MB/s  decomp=  3301.8 MB/s (3.302 GB/s, median of 9 reps)
+    [raw             ] zstd-3   ratio= 1.000x  comp=   604.9 MB/s  decomp=  3247.3 MB/s (3.247 GB/s, median of 9 reps)
+    [raw             ] lz4      ratio= 1.000x  comp=  1406.0 MB/s  decomp=  2068.6 MB/s (2.069 GB/s, median of 9 reps)
+    [raw             ] zlib-1   ratio= 1.000x  comp=    29.3 MB/s  decomp=   472.0 MB/s (0.472 GB/s, median of 9 reps)
+    [random_control  ] zstd-1   ratio= 1.000x  comp=  2232.8 MB/s  decomp=  3684.9 MB/s (3.685 GB/s, median of 9 reps)
+    [random_control  ] zstd-3   ratio= 1.000x  comp=  1819.4 MB/s  decomp=  3669.9 MB/s (3.670 GB/s, median of 9 reps)
+    [random_control  ] lz4      ratio= 1.000x  comp=  1607.9 MB/s  decomp=  2165.5 MB/s (2.166 GB/s, median of 9 reps)
+    [random_control  ] zlib-1   ratio= 1.000x  comp=    32.1 MB/s  decomp=  1223.3 MB/s (1.223 GB/s, median of 9 reps)
+    [byteplane_N2    ] zstd-3   ratio= 1.000x  comp=   590.0 MB/s  decomp=  2585.1 MB/s (2.585 GB/s, median of 9 reps)
+    [byteplane_N4    ] zstd-3   ratio= 1.000x  comp=   500.3 MB/s  decomp=  3458.6 MB/s (3.459 GB/s, median of 9 reps)
+
+[blob 3] layer=40 kind=gate qtype=IQ2_XXS expert=44 tensor=blk.40.ffn_gate_exps.weight
+  loaded 2162688 bytes (2.163 MB) from memmap in 0.008s (disk read time, NOT counted in codec timing)
+    [raw             ] zstd-1   ratio= 1.000x  comp=   691.4 MB/s  decomp=  3915.8 MB/s (3.916 GB/s, median of 9 reps)
+    [raw             ] zstd-3   ratio= 1.000x  comp=   570.4 MB/s  decomp=  3629.9 MB/s (3.630 GB/s, median of 9 reps)
+    [raw             ] lz4      ratio= 1.000x  comp=  1594.9 MB/s  decomp=  2158.8 MB/s (2.159 GB/s, median of 9 reps)
+    [raw             ] zlib-1   ratio= 1.000x  comp=    30.6 MB/s  decomp=   408.7 MB/s (0.409 GB/s, median of 9 reps)
+    [random_control  ] zstd-1   ratio= 1.000x  comp=  1915.4 MB/s  decomp=  2853.2 MB/s (2.853 GB/s, median of 9 reps)
+    [random_control  ] zstd-3   ratio= 1.000x  comp=  1764.5 MB/s  decomp=  3581.8 MB/s (3.582 GB/s, median of 9 reps)
+    [random_control  ] lz4      ratio= 1.000x  comp=  1531.8 MB/s  decomp=  2102.1 MB/s (2.102 GB/s, median of 9 reps)
+    [random_control  ] zlib-1   ratio= 1.000x  comp=    32.4 MB/s  decomp=  1258.6 MB/s (1.259 GB/s, median of 9 reps)
+    [byteplane_N2    ] zstd-3   ratio= 1.000x  comp=   603.4 MB/s  decomp=  3040.0 MB/s (3.040 GB/s, median of 9 reps)
+    [byteplane_N4    ] zstd-3   ratio= 1.000x  comp=   557.2 MB/s  decomp=  3527.5 MB/s (3.527 GB/s, median of 9 reps)
+
+[blob 4] layer=0 kind=down qtype=IQ3_XXS expert=15 tensor=blk.0.ffn_down_exps.weight
+  loaded 3211264 bytes (3.211 MB) from memmap in 0.021s (disk read time, NOT counted in codec timing)
+    [raw             ] zstd-1   ratio= 1.000x  comp=   733.5 MB/s  decomp=  3525.4 MB/s (3.525 GB/s, median of 9 reps)
+    [raw             ] zstd-3   ratio= 1.000x  comp=   599.8 MB/s  decomp=  3660.0 MB/s (3.660 GB/s, median of 9 reps)
+    [raw             ] lz4      ratio= 1.000x  comp=  1520.3 MB/s  decomp=  2063.5 MB/s (2.064 GB/s, median of 9 reps)
+    [raw             ] zlib-1   ratio= 1.003x  comp=    28.6 MB/s  decomp=   266.0 MB/s (0.266 GB/s, median of 9 reps)
+    [random_control  ] zstd-1   ratio= 1.000x  comp=  2353.3 MB/s  decomp=  3901.4 MB/s (3.901 GB/s, median of 9 reps)
+    [random_control  ] zstd-3   ratio= 1.000x  comp=  1913.7 MB/s  decomp=  3923.8 MB/s (3.924 GB/s, median of 9 reps)
+    [random_control  ] lz4      ratio= 1.000x  comp=  1547.9 MB/s  decomp=  2118.8 MB/s (2.119 GB/s, median of 9 reps)
+    [random_control  ] zlib-1   ratio= 1.000x  comp=    34.4 MB/s  decomp=  1327.8 MB/s (1.328 GB/s, median of 9 reps)
+    [byteplane_N2    ] zstd-3   ratio= 1.000x  comp=   695.8 MB/s  decomp=  3876.5 MB/s (3.876 GB/s, median of 9 reps)
+    [byteplane_N4    ] zstd-3   ratio= 1.000x  comp=   761.1 MB/s  decomp=  3477.7 MB/s (3.478 GB/s, median of 9 reps)
+
+[blob 5] layer=41 kind=down qtype=IQ3_XXS expert=47 tensor=blk.41.ffn_down_exps.weight
+  loaded 3211264 bytes (3.211 MB) from memmap in 0.017s (disk read time, NOT counted in codec timing)
+    [raw             ] zstd-1   ratio= 1.000x  comp=   756.9 MB/s  decomp=  3922.4 MB/s (3.922 GB/s, median of 9 reps)
+    [raw             ] zstd-3   ratio= 1.000x  comp=   722.8 MB/s  decomp=  3984.7 MB/s (3.985 GB/s, median of 9 reps)
+    [raw             ] lz4      ratio= 1.000x  comp=  1679.7 MB/s  decomp=  2136.9 MB/s (2.137 GB/s, median of 9 reps)
+    [raw             ] zlib-1   ratio= 1.002x  comp=    30.8 MB/s  decomp=   279.3 MB/s (0.279 GB/s, median of 9 reps)
+    [random_control  ] zstd-1   ratio= 1.000x  comp=  2544.4 MB/s  decomp=  3919.0 MB/s (3.919 GB/s, median of 9 reps)
+    [random_control  ] zstd-3   ratio= 1.000x  comp=  2177.0 MB/s  decomp=  3949.4 MB/s (3.949 GB/s, median of 9 reps)
+    [random_control  ] lz4      ratio= 1.000x  comp=  1641.8 MB/s  decomp=  2162.9 MB/s (2.163 GB/s, median of 9 reps)
+    [random_control  ] zlib-1   ratio= 1.000x  comp=    35.9 MB/s  decomp=  1368.9 MB/s (1.369 GB/s, median of 9 reps)
+    [byteplane_N2    ] zstd-3   ratio= 1.000x  comp=   784.9 MB/s  decomp=  3859.7 MB/s (3.860 GB/s, median of 9 reps)
+    [byteplane_N4    ] zstd-3   ratio= 1.000x  comp=   816.3 MB/s  decomp=  3800.3 MB/s (3.800 GB/s, median of 9 reps)
+
+[blob 6] layer=26 kind=down qtype=MXFP4 expert=13 tensor=blk.26.ffn_down_exps.weight
+  loaded 4456448 bytes (4.456 MB) from memmap in 0.023s (disk read time, NOT counted in codec timing)
+    [raw             ] zstd-1   ratio= 1.047x  comp=   721.4 MB/s  decomp=   812.4 MB/s (0.812 GB/s, median of 9 reps)
+    [raw             ] zstd-3   ratio= 1.046x  comp=   404.6 MB/s  decomp=   851.7 MB/s (0.852 GB/s, median of 9 reps)
+    [raw             ] lz4      ratio= 1.000x  comp=  1526.5 MB/s  decomp=  2087.2 MB/s (2.087 GB/s, median of 9 reps)
+    [raw             ] zlib-1   ratio= 1.040x  comp=    25.5 MB/s  decomp=   231.3 MB/s (0.231 GB/s, median of 9 reps)
+    [random_control  ] zstd-1   ratio= 1.000x  comp=  2526.3 MB/s  decomp=  3767.1 MB/s (3.767 GB/s, median of 9 reps)
+    [random_control  ] zstd-3   ratio= 1.000x  comp=  2093.9 MB/s  decomp=  3779.2 MB/s (3.779 GB/s, median of 9 reps)
+    [random_control  ] lz4      ratio= 1.000x  comp=  1673.0 MB/s  decomp=  2222.2 MB/s (2.222 GB/s, median of 9 reps)
+    [random_control  ] zlib-1   ratio= 1.000x  comp=    34.7 MB/s  decomp=  1407.4 MB/s (1.407 GB/s, median of 9 reps)
+    [byteplane_N2    ] zstd-3   ratio= 1.046x  comp=   396.9 MB/s  decomp=   812.4 MB/s (0.812 GB/s, median of 9 reps)
+    [byteplane_N4    ] zstd-3   ratio= 1.046x  comp=   311.1 MB/s  decomp=   797.0 MB/s (0.797 GB/s, median of 9 reps)
+
+[blob 7] layer=42 kind=down qtype=MXFP4 expert=101 tensor=blk.42.ffn_down_exps.weight
+  loaded 4456448 bytes (4.456 MB) from memmap in 0.026s (disk read time, NOT counted in codec timing)
+    [raw             ] zstd-1   ratio= 1.056x  comp=   692.7 MB/s  decomp=   783.2 MB/s (0.783 GB/s, median of 9 reps)
+    [raw             ] zstd-3   ratio= 1.055x  comp=   341.1 MB/s  decomp=   797.1 MB/s (0.797 GB/s, median of 9 reps)
+    [raw             ] lz4      ratio= 1.000x  comp=  1597.0 MB/s  decomp=  1995.1 MB/s (1.995 GB/s, median of 9 reps)
+    [raw             ] zlib-1   ratio= 1.047x  comp=    26.3 MB/s  decomp=   237.0 MB/s (0.237 GB/s, median of 9 reps)
+    [random_control  ] zstd-1   ratio= 1.000x  comp=  2467.6 MB/s  decomp=  3206.3 MB/s (3.206 GB/s, median of 9 reps)
+    [random_control  ] zstd-3   ratio= 1.000x  comp=  1985.9 MB/s  decomp=  3734.2 MB/s (3.734 GB/s, median of 9 reps)
+    [random_control  ] lz4      ratio= 1.000x  comp=  1656.5 MB/s  decomp=  2212.5 MB/s (2.213 GB/s, median of 9 reps)
+    [random_control  ] zlib-1   ratio= 1.000x  comp=    35.0 MB/s  decomp=  1395.3 MB/s (1.395 GB/s, median of 9 reps)
+    [byteplane_N2    ] zstd-3   ratio= 1.055x  comp=   373.8 MB/s  decomp=   811.5 MB/s (0.811 GB/s, median of 9 reps)
+    [byteplane_N4    ] zstd-3   ratio= 1.055x  comp=   393.6 MB/s  decomp=   809.7 MB/s (0.810 GB/s, median of 9 reps)
+
+Total bytes read from disk this run: 22937600 (22.9 MB)
+CSV written to D:\2025_Cursor_Dev\V4-local-serving\v4flash-16gb\bench\results\compress_test.csv
+
+====================================================================================================
+PER-QUANT-TYPE x CODEC SUMMARY (raw variant, mean across sampled blobs of that type)
+====================================================================================================
+  quant_type codec      n    ratio  comp_MBps  decomp_MBps  decomp_GBps
+  IQ1_S      zstd-1     2    1.000      715.3       3795.8        3.796
+  IQ1_S      zstd-3     2    1.000      600.4       3909.5        3.910
+  IQ1_S      lz4        2    1.000     1634.2       2532.6        2.533
+  IQ1_S      zlib-1     2    1.000       33.3       1129.2        1.129
+  IQ2_XXS    zstd-1     2    1.000      696.9       3608.8        3.609
+  IQ2_XXS    zstd-3     2    1.000      587.6       3438.6        3.439
+  IQ2_XXS    lz4        2    1.000     1500.4       2113.7        2.114
+  IQ2_XXS    zlib-1     2    1.000       30.0        440.3        0.440
+  IQ3_XXS    zstd-1     2    1.000      745.2       3723.9        3.724
+  IQ3_XXS    zstd-3     2    1.000      661.3       3822.3        3.822
+  IQ3_XXS    lz4        2    1.000     1600.0       2100.2        2.100
+  IQ3_XXS    zlib-1     2    1.003       29.7        272.7        0.273
+  MXFP4      zstd-1     2    1.051      707.0        797.8        0.798
+  MXFP4      zstd-3     2    1.050      372.9        824.4        0.824
+  MXFP4      lz4        2    1.000     1561.8       2041.2        2.041
+  MXFP4      zlib-1     2    1.043       25.9        234.1        0.234
+
+====================================================================================================
+RANDOM CONTROL SUMMARY (os.urandom, matching sizes, mean across all blobs)
+====================================================================================================
+  zstd-1    n=  8  mean_ratio=1.0000x
+  zstd-3    n=  8  mean_ratio=1.0000x
+  lz4       n=  8  mean_ratio=0.9999x
+  zlib-1    n=  8  mean_ratio=0.9997x
+
+====================================================================================================
+BYTE-PLANE SEPARATION (structural test, codec=zstd-3)
+====================================================================================================
+  blob  0 (IQ1_S     ) byteplane_N2  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  0 (IQ1_S     ) byteplane_N4  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  1 (IQ1_S     ) byteplane_N2  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  1 (IQ1_S     ) byteplane_N4  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  2 (IQ2_XXS   ) byteplane_N2  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  2 (IQ2_XXS   ) byteplane_N4  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  3 (IQ2_XXS   ) byteplane_N2  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  3 (IQ2_XXS   ) byteplane_N4  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  4 (IQ3_XXS   ) byteplane_N2  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  4 (IQ3_XXS   ) byteplane_N4  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  5 (IQ3_XXS   ) byteplane_N2  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  5 (IQ3_XXS   ) byteplane_N4  : ratio=1.0000x vs raw-interleaved 1.0000x  (delta=+0.0000)
+  blob  6 (MXFP4     ) byteplane_N2  : ratio=1.0460x vs raw-interleaved 1.0459x  (delta=+0.0001)
+  blob  6 (MXFP4     ) byteplane_N4  : ratio=1.0460x vs raw-interleaved 1.0459x  (delta=+0.0001)
+  blob  7 (MXFP4     ) byteplane_N2  : ratio=1.0548x vs raw-interleaved 1.0549x  (delta=-0.0001)
+  blob  7 (MXFP4     ) byteplane_N4  : ratio=1.0549x vs raw-interleaved 1.0549x  (delta=+0.0000)
+
+  mean delta ratio, byteplane N=2 vs raw: +0.0000
+  mean delta ratio, byteplane N=4 vs raw: +0.0000
+  byte-plane separation does NOT help measurably on this data.
+
+====================================================================================================
+VERDICT
+====================================================================================================
+Threshold test: idea is only worth building if ratio > 1.15 AND decompression throughput > 1.50 GB/s (measured disk = 1.10 GB/s).
+
+Random control (os.urandom, all codecs, all blob sizes): mean ratio = 0.9999x (expected ~1.00x for incompressible data)
+
+Best single (quant_type, codec) combo on RAW quantized bytes: MXFP4 + zstd-1 -> ratio=1.0513x, decompress=797.8 MB/s (0.7978 GB/s), n=2
+Best codec overall (pooled across all sampled blobs, raw variant): zstd-1 -> mean ratio=1.0128x, mean decompress=2981.6 MB/s (2.9816 GB/s)
+
+DEAD: best ratio 1.051x versus 1.000x for random control. Failed: ratio 1.051x <= threshold 1.15x; decompression 0.798 GB/s <= threshold 1.5 GB/s. Best real-data ratio (1.051x) is measurably above the random-data control (1.000x), but still not enough to clear the threshold. Do not revisit.
+====================================================================================================

@@ -1,0 +1,46 @@
+align_test.py - can the 76 GB expert repack be deleted?
+tensor index : D:\2025_Cursor_Dev\V4-local-serving\v4flash-16gb\bench\results\tensor_index.json
+tensors       : 1328
+LOGICAL SECTOR SIZE USED FOR THE TEST: 512 bytes
+
+routed-expert tensors : 129
+experts per tensor    : 256
+
+==============================================================================
+RESULTS
+==============================================================================
+PASS  (a) n_bytes divisible by n_expert: 0 violations out of 129
+PASS  (b) bytes_per_expert %% 512 == 0  [THE ONE THAT MATTERS]: 0 violations out of 129
+
+INFO  base-offset residues mod 512 (this is SLOP TO SKIP, not a failure):
+        residue   320:   51 tensor(s)  (= 32 x 10; still 32-byte aligned, so ggml SIMD loads are fine)
+        residue   416:   78 tensor(s)  (= 32 x 13; still 32-byte aligned, so ggml SIMD loads are fine)
+      worst case extra bytes read per expert: 512 (0.0312% of the smallest expert)
+
+PER-EXPERT READ SIZES (what one expert costs, by tensor kind):
+   gate: 2 distinct stride(s), min=1,638,400 max=2,162,688 bytes   ALL >= 64 KiB
+     up: 2 distinct stride(s), min=1,638,400 max=2,162,688 bytes   ALL >= 64 KiB
+   down: 2 distinct stride(s), min=3,211,264 max=4,456,448 bytes   ALL >= 64 KiB
+
+ONE FULL EXPERT (gate+up+down) : min=6,488,064  mean=6,862,990  max=8,781,824 bytes  over 43 MoE layers
+  -> 3 separate reads per expert (gate, up, down are 3 distinct tensors,
+     NOT contiguous with each other), so 6 experts = 18 reads per layer per token.
+
+==============================================================================
+VERDICT: ALIGNMENT IS NOT A REASON TO REPACK
+
+Every per-expert stride is a whole number of sectors, so expert e and
+expert e+1 sit at the same sub-sector phase and never share a sector. The
+constant base-offset slop shown above is absorbed by reading the enclosing
+aligned window and returning buf + slop, at a cost of at most one sector
+per expert.
+
+An unbuffered (FILE_FLAG_NO_BUFFERING) reader can address experts IN PLACE
+inside the original GGUF shards.
+
+This settles alignment only. The other argument for a repack is CONTIGUITY
+(gate/up/down are three separate tensors, so one expert costs three seeks).
+That was measured separately by src/expert_read_bench.c and found to be
+worth about 5% at queue depth >= 2 - not worth a 76 GB write. See
+docs/MEASURED_GROUND_TRUTH.md section 10.1.
+==============================================================================

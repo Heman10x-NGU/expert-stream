@@ -1,0 +1,288 @@
+==============================================================================
+hotlist_extract.py -- Task 0.13 hotlist parse + coverage analysis
+run timestamp (UTC): 2026-08-08T22:48:11.177722+00:00
+source file: D:\2025_Cursor_Dev\V4-local-serving\ds4\ds4_streaming_hotlist.inc
+==============================================================================
+
+--- Arrays found in .inc file ---
+  ds4_default_streaming_hotlist_pro             type=uint16_t       inner_dim=2 entries=6884  (lines 3-6888)
+  ds4_default_streaming_hotlist_flash           type=uint16_t       inner_dim=2 entries=6436  (lines 6894-13331)
+
+--- Cross-check against declared *_count constants in file ---
+  ds4_default_streaming_hotlist_pro_count -> sizeof(ds4_default_streaming_hotlist_pro)/sizeof(ds4_default_streaming_hotlist_pro[0])  (parsed count=6884)
+  ds4_default_streaming_hotlist_flash_count -> sizeof(ds4_default_streaming_hotlist_flash)/sizeof(ds4_default_streaming_hotlist_flash[0])  (parsed count=6436)
+
+--- CONFIRMED COUNTS (parsed directly from file, not trusted from docs) ---
+  Pro array   'ds4_default_streaming_hotlist_pro': 6884 entries
+  Flash array 'ds4_default_streaming_hotlist_flash': 6436 entries
+  Sum (Pro+Flash) = 13320  (this is the number an older doc apparently mistook for the Flash-only count)
+
+--- Field layout evidence ---
+Header comments at top of file (verbatim):
+  /* Generated from ds4 expert hotlist profiles; sorted by hits/weight. */
+  /* DeepSeek V4 Pro default streaming expert hotlist. */
+  static const uint16_t ds4_default_streaming_hotlist_pro[][2] = {
+
+Array declaration is a flat '[][2]' literal -- NOT a named struct.
+There is no third column anywhere in either array; every entry is
+exactly 2 unsigned integers.
+
+Call-site evidence from D:\2025_Cursor_Dev\V4-local-serving\ds4\ds4.c (verbatim, confirms field order):
+  line ~20688-20693:
+    if (g_ds4_shape.variant == DS4_VARIANT_PRO) {
+        hotlist = ds4_default_streaming_hotlist_pro;
+        hotlist_count = ds4_default_streaming_hotlist_pro_count;
+    } else if (g_ds4_shape.variant == DS4_VARIANT_FLASH) {
+        hotlist = ds4_default_streaming_hotlist_flash;
+        hotlist_count = ds4_default_streaming_hotlist_flash_count;
+  ==> CONFIRMS ds4_default_streaming_hotlist_flash is the Flash array
+      (selected only when g_ds4_shape.variant == DS4_VARIANT_FLASH).
+
+  line ~20705-20707 (loop over hotlist[i]):
+    metal_graph_streaming_expert_hotlist_add(
+        hotlist[i][0],
+        hotlist[i][1],
+        max_entries - loaded, ...)
+
+  function signature at line ~20568:
+    static bool metal_graph_streaming_expert_hotlist_add(
+        uint32_t    layer,
+        uint32_t    expert,
+        uint32_t    priority, ...)
+  ==> CONFIRMS column [0] = layer index, column [1] = expert index.
+      The 3rd call argument "priority" is NOT read from the file --
+      it is synthesized at load time as (max_entries - loaded), i.e.
+      purely from array POSITION (rank), descending as position
+      increases through the array.
+
+  NOTE: ds4.c also defines an in-memory struct used only by the
+  runtime profiler (NOT present in the .inc file):
+    typedef struct {
+        uint32_t layer;
+        uint32_t expert;
+        uint64_t count;
+        double   weight;
+    } ds4_expert_hotlist_entry;
+  This 4-field struct is used to sort experts by (count, weight)
+  before the profiler ever writes them out, but only the resulting
+  RANK ORDER is baked into the .inc file -- (layer, expert) pairs
+  only. Raw hit counts/weights are NOT present in the .inc file.
+
+==> VERDICT: entries do NOT carry a weight or hit-count field.
+    Only ordered (layer, expert) pairs are available. This weakens
+    the coverage analysis as flagged by the task instructions:
+    we can report position-based (rank) coverage but CANNOT report
+    a hit-count-weighted 'fraction of total profiled hits' number.
+
+5 example raw lines from the Flash array (verbatim, immediately
+after its declaration line 6894):
+      {25, 53},
+      {22, 66},
+      {38, 63},
+      {40, 104},
+      {34, 44},
+
+==============================================================================
+FLASH ARRAY STATISTICS (ds4_default_streaming_hotlist_flash)
+==============================================================================
+  total entry count        : 6436
+  distinct layers referenced: 43
+  layer index min / max     : 0 / 42
+  distinct experts referenced (global expert-id values seen in column 1): 256
+  expert index min / max    : 0 / 255
+
+--- Per-layer histogram (Flash) ---
+  layer  count   
+  0      251     
+  1      252     
+  2      254     
+  3      177     
+  4      158     
+  5      172     
+  6      161     
+  7      138     
+  8      139     
+  9      148     
+  10     160     
+  11     142     
+  12     126     
+  13     135     
+  14     118     
+  15     131     
+  16     138     
+  17     138     
+  18     136     
+  19     183     
+  20     154     
+  21     138     
+  22     148     
+  23     154     
+  24     125     
+  25     150     
+  26     125     
+  27     134     
+  28     134     
+  29     135     
+  30     136     
+  31     141     
+  32     133     
+  33     134     
+  34     142     
+  35     154     
+  36     103     
+  37     137     
+  38     137     
+  39     159     
+  40     121     
+  41     144     
+  42     141     
+
+  --- Per-layer histogram (ASCII bar chart) ---
+   0 | ################################################# 251
+   1 | ################################################## 252
+   2 | ################################################## 254
+   3 | ################################### 177
+   4 | ############################### 158
+   5 | ################################## 172
+   6 | ################################ 161
+   7 | ########################### 138
+   8 | ########################### 139
+   9 | ############################# 148
+  10 | ############################### 160
+  11 | ############################ 142
+  12 | ######################### 126
+  13 | ########################### 135
+  14 | ####################### 118
+  15 | ########################## 131
+  16 | ########################### 138
+  17 | ########################### 138
+  18 | ########################### 136
+  19 | #################################### 183
+  20 | ############################## 154
+  21 | ########################### 138
+  22 | ############################# 148
+  23 | ############################## 154
+  24 | ######################### 125
+  25 | ############################## 150
+  26 | ######################### 125
+  27 | ########################## 134
+  28 | ########################## 134
+  29 | ########################### 135
+  30 | ########################### 136
+  31 | ############################ 141
+  32 | ########################## 133
+  33 | ########################## 134
+  34 | ############################ 142
+  35 | ############################## 154
+  36 | #################### 103
+  37 | ########################### 137
+  38 | ########################### 137
+  39 | ############################### 159
+  40 | ######################## 121
+  41 | ############################ 144
+  42 | ############################ 141
+
+--- Weight / hit-count distribution ---
+  UNKNOWN / NOT APPLICABLE: the .inc file entries carry no weight
+  or hit-count field (see field-layout evidence above). Only
+  positional rank is available.
+
+--- Sortedness check ---
+  entries sorted by layer ascending : False
+  entries sorted by layer descending: False
+  entries sorted by expert ascending (global): False
+  Not sorted by layer or by expert index. Consistent with the
+  header comment '/* ... sorted by hits/weight. */': the
+  positional order reflects descending profiled hit rank, which
+  is not recoverable as a numeric field, only as array position.
+  (We cannot independently verify this against a hit-count
+  column because none exists in this file -- UNKNOWN whether
+  the rank claim in the comment is literally exact.)
+
+==============================================================================
+COVERAGE ANALYSIS
+==============================================================================
+  Assumptions (given by task spec, NOT derived from source):
+    layers                 = 43
+    routed experts / layer = 256
+    total routed experts   = 11008
+    MB per expert          = 7.1
+    cache budget           = 10.0 GB
+
+  Flash hotlist distinct (layer,expert) pairs : 6436
+  Fraction of all 11008 routed experts covered   : 0.5847  (58.47%)
+
+  Full Flash hotlist footprint if fully cached:
+    6436 experts * 7.1 MB = 45695.6 MB = 44.625 GB
+
+  Given a 10.0 GB (10240 MB) cache budget at 7.1 MB/expert:
+    max experts that fit          : 1442
+    top-N entries that fit (N)    : 1442
+    fraction of Flash hotlist that is (top-N / total distinct): 0.2241  (22.41%)
+    fraction of ALL 11008 routed experts this represents: 0.1310  (13.10%)
+
+  Predicted cold-start hit rate from top-N entries' share of total
+  profiled hits: UNKNOWN -- cannot be computed. The .inc file carries
+  no hit-count/weight column (see field-layout evidence above), so
+  there is no 'total profiled hits' quantity available to divide by.
+  This is exactly the caveat flagged by the task: without hit counts
+  in the source file, the coverage analysis can only report slot
+  coverage and byte footprint, not a hit-rate prediction. To get a
+  real predicted hit-rate number, the runtime-generated hotlist text
+  file (columns: layer expert hits weight, written by
+  ds4_expert_profile_write_hotlist_file in ds4.c) would need to be
+  sourced instead of the baked-in .inc arrays.
+
+==============================================================================
+JSON OUTPUT
+==============================================================================
+Schema for both hotlist_flash.json and hotlist_pro.json:
+  {
+    "schema_version": 1,
+    "source_file": "<absolute path to ds4_streaming_hotlist.inc>",
+    "array_identifier": "<exact C identifier of the source array>",
+    "variant": "flash" | "pro",
+    "entry_count": <int, number of (layer, expert) pairs>,
+    "field_layout": ["layer", "expert"],  // column 0, column 1
+    "has_weight_or_hitcount": false,       // confirmed absent, see report
+    "note": "position in this array is the rank order used by ds4 ")
+             ("at load time via priority = max_entries - loaded; ")
+             ("no numeric hit-count/weight is stored in this file.")
+    "entries": [ {"layer": int, "expert": int, "rank": int}, ... ]
+      // rank is 0-based position in the source array (0 = hottest)
+  }
+
+  Wrote D:\2025_Cursor_Dev\V4-local-serving\v4flash-16gb\bench\results\hotlist_flash.json (6436 entries)
+  Wrote D:\2025_Cursor_Dev\V4-local-serving\v4flash-16gb\bench\results\hotlist_pro.json (6884 entries)
+
+==============================================================================
+PRO vs FLASH COMPARISON
+==============================================================================
+  Exact (layer, expert) pair overlap:
+    Pro distinct pairs   : 6884
+    Flash distinct pairs : 6436
+    Shared pairs         : 1976
+    Shared / Flash        : 0.3070 (30.70%)
+
+  Expert-id overlap ignoring layer (column 1 values only, i.e. is
+  it 'the same expert index' regardless of which layer it's in):
+    Pro distinct expert ids   : 384
+    Flash distinct expert ids : 256
+    Shared expert ids         : 256
+    Shared / Flash             : 1.0000 (100.00%)
+
+  ==> Pro and Flash DO share hot (layer, expert) pairs. This
+  suggests some routing hotspots are structural to the
+  architecture/training data rather than purely a function of
+  model size, which is a useful hint that a hotlist built for
+  one variant has some transfer value to the other.
+
+  Layer range check (relevant because Pro/Flash likely have
+  different total layer counts, which affects how comparable a
+  raw layer-index overlap is):
+    Pro   layer min/max: 0 / 60  (61 distinct layers)
+    Flash layer min/max: 0 / 42  (43 distinct layers)
+
+==============================================================================
+DONE. Full console output also written to: D:\2025_Cursor_Dev\V4-local-serving\v4flash-16gb\bench\results\hotlist.txt
+==============================================================================

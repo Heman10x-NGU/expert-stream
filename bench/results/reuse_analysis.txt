@@ -1,0 +1,32 @@
+analyze_reuse.py - does a bounded expert cache actually help?
+per-expert bytes: min=6,488,064 mean=6,862,990 max=8,781,824  over 43 MoE layers
+disk assumption : 850 MB/s sustained random read (measured)
+
+============================================================================================
+TRACE moe_trace-long250-20260809-200544.csv
+  tokens 220   layers 43   accesses 56,760   bytes if nothing were cached 362.791 GiB   (1.649 GiB/token)
+  distinct (layer,expert) pairs touched = 6,278 of 56,760 accesses  -> 88.9% of accesses are repeats
+  consecutive-token expert overlap = 35.6% (mean over 9,417 layer-pairs)
+
+     cache   experts      LRU      LFU   CYCLIC    GUARD   Belady    LRU t/s  GRD t/s  Belady t/s
+       1GB       156     0.0%    21.9%    12.8%     0.0%    43.5%       0.50     0.50        0.89
+       2GB       313    35.6%    31.2%    23.3%    35.6%    56.7%       0.78     0.78        1.16
+       4GB       626    48.1%    43.6%    37.9%    48.2%    68.8%       0.97     0.97        1.62
+       6GB       939    56.6%    52.6%    49.1%    56.7%    75.0%       1.16     1.16        2.02
+
+  GUARD = LRU that will not evict an entry whose layer is within 4
+  layers of the current one. tok/s columns are I/O-ONLY UPPER BOUNDS: miss bytes
+  divided by measured disk throughput, zero compute, perfect overlap.
+
+  Share of the LRU-to-Belady gap closed (negative = worse than LRU):
+        1GB  LRU   0.0%  Belady  43.5%   CYCLIC    29.5%   LFU    50.3%   GUARD     0.0%
+        2GB  LRU  35.6%  Belady  56.7%   CYCLIC   -58.3%   LFU   -21.0%   GUARD     0.0%
+        4GB  LRU  48.1%  Belady  68.8%   CYCLIC   -49.1%   LFU   -21.7%   GUARD     0.6%
+        6GB  LRU  56.6%  Belady  75.0%   CYCLIC   -41.0%   LFU   -21.6%   GUARD     0.3%
+
+============================================================================================
+HOW TO READ THIS
+  If Belady is far above LRU, a lookahead-driven eviction policy (N-2) is worth
+  building. If they are close, the OS page cache is already near-optimal for this
+  access pattern and N-2 should be cut - the win would have to come from reading
+  fewer bytes (N-3 expert skipping, smaller quant), not from smarter eviction.
