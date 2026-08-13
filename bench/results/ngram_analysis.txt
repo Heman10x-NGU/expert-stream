@@ -1,0 +1,94 @@
+O-8 N-GRAM DRAFTER ACCEPTANCE
+can a weightless drafter supply the tokens that batching needs?
+
+SCOPE, up front: this measures how predictable a TOKEN STREAM is under suffix
+matching, using the model's exact tokenizer. It is not a measurement of this
+model's own output - at 0.5 tok/s every generation we have is a few tokens long.
+Genre is never averaged, because n-gram drafting lives or dies on repetitiveness.
+
+==============================================================================
+prose-markdown  --  HONEST_ASSESSMENT.md
+1777 tokens
+==============================================================================
+
+  N   | accept/tok | coverage | tok/round | need      | MiB/tok    | vs no batching
+  --------------------------------------------------------------------------------------
+  1   |     0.000 |    0.000 |     1.000 |     1.000 |     1485.6 | baseline
+  2   |     0.270 |    0.143 |     1.039 |     1.548 |     2214.7 | 1.49x  loses
+  3   |     0.195 |    0.132 |     1.052 |     1.937 |     2736.2 | 1.84x  loses
+  4   |     0.150 |    0.127 |     1.057 |     2.370 |     3330.6 | 2.24x  loses
+  5   |     0.114 |    0.127 |     1.058 |     2.657 |     3731.2 | 2.51x  loses
+  6   |     0.091 |    0.127 |     1.058 |     3.053 |     4288.3 | 2.89x  loses
+  7   |     0.076 |    0.127 |     1.058 |     3.268 |     4590.2 | 3.09x  loses
+  8   |     0.065 |    0.127 |     1.058 |     3.582 |     5030.3 | 3.39x  loses
+
+==============================================================================
+source-python  --  analyze_routing.py
+17207 tokens
+==============================================================================
+
+  N   | accept/tok | coverage | tok/round | need      | MiB/tok    | vs no batching
+  --------------------------------------------------------------------------------------
+  1   |     0.000 |    0.000 |     1.000 |     1.000 |     1485.6 | baseline
+  2   |     0.448 |    0.427 |     1.191 |     1.548 |     1930.6 | 1.30x  loses
+  3   |     0.330 |    0.394 |     1.260 |     1.937 |     2282.8 | 1.54x  loses
+  4   |     0.260 |    0.378 |     1.295 |     2.370 |     2719.7 | 1.83x  loses
+  5   |     0.214 |    0.368 |     1.315 |     2.657 |     3002.4 | 2.02x  loses
+  6   |     0.178 |    0.363 |     1.324 |     3.053 |     3426.4 | 2.31x  loses
+  7   |     0.152 |    0.361 |     1.330 |     3.268 |     3651.9 | 2.46x  loses
+  8   |     0.134 |    0.358 |     1.335 |     3.582 |     3985.6 | 2.68x  loses
+
+==============================================================================
+source-powershell  --  run_first_output.ps1
+6962 tokens
+==============================================================================
+
+  N   | accept/tok | coverage | tok/round | need      | MiB/tok    | vs no batching
+  --------------------------------------------------------------------------------------
+  1   |     0.000 |    0.000 |     1.000 |     1.000 |     1485.6 | baseline
+  2   |     0.447 |    0.320 |     1.143 |     1.548 |     2012.4 | 1.35x  loses
+  3   |     0.315 |    0.295 |     1.186 |     1.937 |     2426.2 | 1.63x  loses
+  4   |     0.245 |    0.282 |     1.207 |     2.370 |     2916.0 | 1.96x  loses
+  5   |     0.196 |    0.276 |     1.217 |     2.657 |     3243.2 | 2.18x  loses
+  6   |     0.166 |    0.271 |     1.225 |     3.053 |     3701.4 | 2.49x  loses
+  7   |     0.140 |    0.270 |     1.227 |     3.268 |     3956.5 | 2.66x  loses
+  8   |     0.122 |    0.269 |     1.229 |     3.582 |     4329.7 | 2.91x  loses
+
+==============================================================================
+tabular-csv  --  expert_manifest.csv
+2396 tokens
+==============================================================================
+
+  N   | accept/tok | coverage | tok/round | need      | MiB/tok    | vs no batching
+  --------------------------------------------------------------------------------------
+  1   |     0.000 |    0.000 |     1.000 |     1.000 |     1485.6 | baseline
+  2   |     0.856 |    0.554 |     1.474 |     1.548 |     1561.0 | 1.05x  loses
+  3   |     0.603 |    0.510 |     1.616 |     1.937 |     1780.8 | 1.20x  loses
+  4   |     0.635 |    0.442 |     1.842 |     2.370 |     1911.8 | 1.29x  loses
+  5   |     0.483 |    0.439 |     1.849 |     2.657 |     2134.0 | 1.44x  loses
+  6   |     0.480 |    0.403 |     1.969 |     3.053 |     2304.0 | 1.55x  loses
+  7   |     0.440 |    0.387 |     2.022 |     3.268 |     2401.4 | 1.62x  loses
+  8   |     0.401 |    0.377 |     2.057 |     3.582 |     2587.2 | 1.74x  loses
+
+wrote D:\2025_Cursor_Dev\V4-local-serving\v4flash-16gb\bench\results\ngram_acceptance.csv
+
+==============================================================================
+HOW TO READ THIS
+==============================================================================
+  'coverage' is the fraction of rounds where the drafter could propose ANYTHING at all.
+  It is the reason a genre can show 0.856 acceptance and still commit only 1.474 tokens
+  per round: a suffix that has never been seen produces no draft, and that round commits
+  exactly one token while still paying union(N) bytes.
+
+  'tok/round' is the whole game. A round always reads union(N) experts. If it commits
+  1.0 tokens, batching cost you extra bytes for nothing. The break-even tok/round is
+  union(N)/6.00 - so N=2 needs 1.55 tokens per round, N=8 needs 3.58.
+
+  A genre that clears it says nothing about a genre that does not. The spread IS the
+  result: if only structured text clears the bar, then batching is a feature for
+  code and data workloads and not for chat, and that is a design decision, not a bug.
+
+  This does NOT prove the engine would get the win. It proves whether the tokens are
+  obtainable for free. The batched execution path does not exist yet.
+
+wrote D:\2025_Cursor_Dev\V4-local-serving\v4flash-16gb\bench\results\ngram_analysis.txt
