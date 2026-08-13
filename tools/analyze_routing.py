@@ -76,6 +76,16 @@ OVERLAP_NS = [1, 2, 3, 4, 6, 8, 12, 16]
 MIN_TOKENS_FOR_POOL = 3     # captures shorter than this are excluded from the default auto-pool
 MIN_WINDOWS_FOR_VERDICT = 5  # refuse to render a verdict for any N with fewer pooled windows than this
 
+# Tag prefixes that must NEVER enter the default auto-pool.
+#
+# The O-6 fan-out captures (tag "fan*") are 16 runs of only TWO prompts, each pair
+# differing in a single final token. Pooling them would silently weight one prefix
+# eight times over and inflate every overlap statistic in this file -- the captures
+# are near-duplicates by construction, which is the entire point of that experiment
+# and exactly what makes them poison here. They are analyzed by tools/analyze_fanout.py
+# instead. Passing such a file explicitly on the command line still works.
+POOL_EXCLUDE_PREFIXES = ("moe_trace-fan",)
+
 # Shuffled-token control (fixes the "uniform baseline conflates popularity
 # skew with token-to-token correlation" methodology bug). For each layer
 # independently we permute which token position each per-token expert-set
@@ -196,6 +206,11 @@ def find_pool_csvs():
     included = []
     excluded = []
     for path in all_csvs:
+        base = os.path.basename(path)
+        if base.startswith(POOL_EXCLUDE_PREFIXES):
+            excluded.append((path, None, "O-6 fan-out capture: near-duplicate by construction, "
+                                         "see POOL_EXCLUDE_PREFIXES"))
+            continue
         try:
             tmp = pd.read_csv(path, usecols=["token_pos"])
             T = int(tmp["token_pos"].nunique())
