@@ -18,11 +18,23 @@
 #
 # PowerShell 5.1. Pure ASCII.
 
+# WHY -WorkingSetCapMB IS NOW FORWARDED (added 2026-08-13, during O-6).
+# Sixteen captures in a row died mid-prefill with NO error, NO CSV, and exit code 0 -- the
+# most misleading failure mode this repo has produced. guard.ps1 logged the truth: free RAM
+# fell 2530 -> 1650 -> 1041 MB and the process vanished. Uncapped, faulted-in mmap pages sit
+# in the working set where Windows cannot reclaim them; a hard cap forces continuous trimming
+# and moves them to the standby list instead. Same prompt, same flags, cap 5000 MB:
+#   uncapped -> died at layer 8, 0 rows
+#   capped   -> 2580 rows, 43 layers, 10 token positions, 91.1 s
+# The earlier captures in this repo happened to survive because the machine had more free RAM
+# that day. That was luck, and it read exactly like a working script. Default stays 0 (off) so
+# no existing caller changes behavior silently; pass it explicitly.
 param(
-    [string] $PromptGlob = "s??.txt",
-    [int]    $CtxSize    = 128,
-    [int]    $UBatch     = 8,
-    [int]    $PauseSec   = 15
+    [string] $PromptGlob        = "s??.txt",
+    [int]    $CtxSize           = 128,
+    [int]    $UBatch            = 8,
+    [int]    $PauseSec          = 15,
+    [int]    $WorkingSetCapMB   = 0
 )
 
 $ErrorActionPreference = "Continue"
@@ -49,6 +61,12 @@ foreach ($f in $files) {
 
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $runArg = ('"{0}" -PromptFile "{1}" -CtxSize {2} -UBatch {3} -Tag {4}' -f $runner, $f.FullName, $CtxSize, $UBatch, $tag)
+    if ($WorkingSetCapMB -gt 0) {
+        # run_moe_trace.ps1 validates this value itself (floor 3500, and it refuses any cap
+        # that would leave the machine at or below the watchdog floor). Do not second-guess
+        # it here - one owner for that rule.
+        $runArg += (' -WorkingSetCapMB {0}' -f $WorkingSetCapMB)
+    }
     & powershell -NoProfile -File $guard -Run $runArg *> $null
     $code = $LASTEXITCODE
     $sw.Stop()
