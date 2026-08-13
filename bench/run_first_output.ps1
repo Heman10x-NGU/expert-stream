@@ -66,18 +66,43 @@ param(
     # the unaccelerated path while claiming otherwise.
     [string] $ExpertManifest = "",
     [int]    $ExpertArenaMB  = 0,
+    # --- GPU offload, added 2026-08-13 for the Vulkan build -------------------
+    # 0 means CPU-only, which is the behaviour every measurement before today
+    # used. Anything above 0 requires a binary built with a GPU backend; on a
+    # CPU-only build -ngl is SILENTLY IGNORED, which is exactly how the VRAM
+    # item sat at priority 2 for three days while being unexecutable.
+    [int]    $GpuLayers = 0,
+    # WHICH device, and this matters more than it looks. Vulkan enumerates the
+    # AMD integrated GPU too, and its "free memory" is SYSTEM RAM - offloading
+    # there would move attention from one part of our 16 GB to another and free
+    # precisely nothing. Always name the discrete card explicitly.
+    [string] $Device = "",
+    # Keep the KV cache in system RAM rather than VRAM. VRAM is the scarce
+    # resource here and KV is only ~43 MB at ctx 512, so it is the wrong thing
+    # to spend video memory on.
+    [switch] $NoKvOffload,
+    # Tensor-name override, e.g. "exps=CPU" to keep routed experts on the CPU
+    # where our reader handles them. Without this the GPU backend takes the
+    # expert matmuls and expert-stream is bypassed entirely.
+    [string] $OverrideTensor = "",
+    # Micro-batch size. This is the single biggest consumer of VRAM after the
+    # weights themselves, and it is NOT small: measured 2026-08-13, the default
+    # of 512 asks for a 2,089,862,528 byte compute buffer - 2.09 GB - which on a
+    # 6 GB card fails outright with ErrorOutOfDeviceMemory before a single token
+    # is generated. PLAN_REMAINING estimated this overhead at 400 MiB. It is
+    # five times that. 0 leaves llama.cpp's default alone.
+    [int]    $UBatch = 0,
     [string] $Tag      = "first"
 )
 
 $ErrorActionPreference = "Stop"
 
 $repo  = Split-Path -Parent $PSScriptRoot
-# EXPERT_STREAM_LLAMA_CLI / EXPERT_STREAM_MODEL override; author's layout is the
-# last-resort default. See QUICKSTART.md. Both are checked to exist below.
-# GetEnvironmentVariable rather than $env: so this is identical in the scripts
-# that run under Set-StrictMode, where an unset name must not be a bare access.
+# EXPERT_STREAM_LLAMA_CLI selects the binary, so the CPU-only and Vulkan builds
+# can be A/B'd without editing this file. build-cpu stays the default and the
+# reference: every measurement before 2026-08-13 was made with it.
 $exe   = [Environment]::GetEnvironmentVariable("EXPERT_STREAM_LLAMA_CLI")
-if ([string]::IsNullOrEmpty($exe))   { $exe   = "D:\2025_Cursor_Dev\V4-local-serving\llama.cpp\build-cpu\bin\llama-cli.exe" }
+if ([string]::IsNullOrEmpty($exe)) { $exe = "D:\2025_Cursor_Dev\V4-local-serving\llama.cpp\build-cpu\bin\llama-cli.exe" }
 $model = [Environment]::GetEnvironmentVariable("EXPERT_STREAM_MODEL")
 if ([string]::IsNullOrEmpty($model)) { $model = "E:\models\ds4f-iq1s\UD-IQ1_S\DeepSeek-V4-Flash-0731-UD-IQ1_S-00001-of-00003.gguf" }
 
@@ -163,6 +188,28 @@ $argList = @(
 # copying into it - turning evictable file-backed pages into dirty private memory.
 # (An earlier note in this repo claimed --no-repack "does not help". That was measured inside
 # runs that were failing for an unrelated reason. It was wrong. See MEASURED_GROUND_TRUTH 8.2.)
+# --- GPU offload flags, appended before the forbidden-flag check on purpose --
+# so anything added here is still screened for --mlock / --no-mmap.
+if ($GpuLayers -gt 0) {
+    if ($GpuLayers -gt 43) { throw "GpuLayers $GpuLayers exceeds the model's 43 layers." }
+    $argList += @("-ngl", "$GpuLayers")
+    # Refuse to guess the device. Picking the integrated GPU by accident would
+    # produce a run that looks offloaded and frees no system RAM at all, which
+    # is a worse outcome than not running.
+    if ($Device -eq "") {
+        throw "GpuLayers requires -Device (e.g. Vulkan0). Run 'llama-cli --list-devices' first; the integrated GPU's memory is system RAM and offloading to it frees nothing."
+    }
+    $argList += @("--device", $Device)
+    if ($NoKvOffload)          { $argList += "-nkvo" }
+    if ($OverrideTensor -ne "") { $argList += @("-ot", $OverrideTensor) }
+    if ($UBatch -gt 0)          { $argList += @("-ub", "$UBatch") }
+} else {
+    if ($UBatch -gt 0)          { $argList += @("-ub", "$UBatch") }
+    if ($Device -ne "" -or $NoKvOffload -or $OverrideTensor -ne "") {
+        Write-Host "NOTE: -Device/-NoKvOffload/-OverrideTensor ignored because -GpuLayers is 0." -ForegroundColor Yellow
+    }
+}
+
 if (-not $Repack) {
     $argList += "--no-repack"
 } else {
