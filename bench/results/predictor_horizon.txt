@@ -1,0 +1,45 @@
+analyze_predictors.py - how far ahead would N-2 have to see?
+trace   moe_trace-long250-20260809-200544.csv   220 tokens, 56,760 accesses
+alpha   0.3 (EWMA weight for `recur`)
+
+CONTROL - must reproduce analyze_reuse.py's published numbers
+   cache   policy  this tool  published    delta
+      2G      lru      35.6%      35.6%   +0.02
+      4G      lru      48.1%      48.1%   +0.00
+      6G      lru      56.6%      56.6%   +0.03
+      2G   belady      56.7%      56.7%   +0.04
+      4G   belady      68.8%      68.8%   +0.04
+      6G   belady      75.0%      75.0%   +0.03
+
+control passed - LRU and Belady both reproduce. New policies below.
+
+HIT RATE - Belady with a K-token horizon is an UPPER BOUND on any
+predictor that sees K tokens ahead, because it is a perfect one.
+   cache     LRU   recur     k=1     k=2     k=4     k=8    k=16    k=32  Belady
+      2G   35.6%   14.3%   35.6%   43.4%   51.9%   56.7%   56.7%   56.7%   56.7%
+      4G   48.1%   27.5%   48.1%   48.1%   52.0%   61.9%   68.7%   68.8%   68.8%
+      6G   56.6%   37.4%   56.6%   56.6%   56.6%   61.9%   71.5%   75.0%   75.0%
+
+FRACTION OF THE LRU->BELADY GAP CAPTURED
+  This is the number that decides N-2. A horizon that captures little
+  of the gap cannot be worth building a predictor for, because a
+  PERFECT predictor at that horizon would already not be worth it.
+   cache     gap   recur     k=1     k=2     k=4     k=8    k=16    k=32
+      2G   21.1pt   -101%      0%     37%     77%    100%    100%    100%
+      4G   20.7pt    -99%      0%      0%     19%     67%     99%    100%
+      6G   18.4pt   -105%      0%      0%      0%     29%     81%    100%
+
+IMPLIED tok/s at 850 MB/s  (0.5 / (1 - hit))
+   cache     LRU   recur  Belady
+      2G    0.78    0.59    1.16
+      4G    0.97    0.69    1.61
+      6G    1.16    0.80    2.01
+
+ALPHA SENSITIVITY for recur (6 GB cache, LRU baseline 56.6%)
+  alpha 0.05 -> 32.7%
+  alpha 0.10 -> 35.3%
+  alpha 0.30 -> 37.4%   <- best
+  alpha 0.60 -> 37.0%
+  alpha 0.90 -> 35.3%
+No smoothing value brings it within 19 points of LRU. The idea was given a
+fair sweep before being recorded as dead.
