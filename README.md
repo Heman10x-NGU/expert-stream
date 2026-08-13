@@ -53,11 +53,11 @@ machine and a method behind it, [including the ones that killed our own ideas](d
 ## The problem, stated properly
 
 A token routes to **1.649 GiB** of expert weights to produce **~700 KB of activations** —
-**2,500 bytes read per useful byte**. The drive sustains **~850 MB/s** on random reads at this
+**2,500 bytes read per useful byte**. The drive sustains **~1,200 MB/s** on reads at this
 model's transfer sizes. Those two measured numbers multiply out to a wall:
 
 ```
-1.649 GiB / 850 MB/s  =  1.99 s per token  =  0.50 tok/s
+1.649 GiB / 1200 MB/s  =  1.41 s per token  =  0.71 tok/s
 ```
 
 with zero compute, perfect overlap and infinite queue depth. **No amount of I/O engineering beats

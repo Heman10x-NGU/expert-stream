@@ -62,7 +62,9 @@ returns before per-tensor `--tensor-type` overrides are read, so it needs a patc
 | condition | throughput |
 |---|---|
 | Sustained sequential read on the real model file | **1,050 MB/s** (27% of the PCIe 3.0 x4 link) |
-| Random reads at this model's transfer sizes | **~850 MB/s** |
+| Reads at this model's transfer sizes, QD1 | **863 MB/s** |
+| Reads at this model's transfer sizes, QD4 | **1,202 MB/s** |
+| Reads at this model's transfer sizes, QD32 | **1,260 MB/s** |
 | Queue depth 1 | **469 MB/s** |
 | Queue depth 2 | 717 MB/s |
 | Queue depth 8 | **801 MB/s** |
@@ -87,7 +89,11 @@ returns before per-tensor `--tensor-type` overrides are read, so it needs a patc
 ### The ceiling this implies
 
 ```
-1.649 GiB per token / 850 MB/s = 1.99 s/token = 0.503 tok/s
+1.649 GiB per token / 1200 MB/s = 1.41 s/token = 0.71 tok/s
+
+NOTE, settled 2026-08-14: this repo previously said 850 MB/s and 0.503 tok/s. Both the 850 and
+a competing 1187 figure were real - they are DIFFERENT QUEUE DEPTHS, and the reader operates in
+the deep region. Any 0.503 remaining elsewhere in this repo understates the hardware.
 ```
 
 with zero compute, perfect overlap and infinite queue depth. Therefore
@@ -364,7 +370,10 @@ Results: `bench/results/expert_spectrum.csv`, `compress_test.csv`, `fanout_analy
 
 ## 11. What is NOT claimed
 
-- **No claim that this is fast.** It is ~0.3 tok/s against a realistic ceiling of ~1.4.
+- **No claim that this is fast.** Measured marginal cost is ~3.7 s per token.
+- **No claim that expert streaming is the bottleneck any more.** The disk bench says one
+  token's expert reads cost ~1.4 s; the engine's marginal cost per token is ~3.7 s. Roughly
+  60-70% of a token is spent elsewhere and has never been profiled. See `FINAL_CONCLUSION.md`.
 - **No claim about Linux or macOS.** The reader is Windows-only and has not been ported.
 - **No claim that 12/15 generalises.** Fifteen questions is a smoke test, not a benchmark.
 - **No claim that quantization caused the fast-path failures.** No less-compressed quant was run.
