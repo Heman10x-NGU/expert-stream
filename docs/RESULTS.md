@@ -346,12 +346,19 @@ mistaken for a measured fact.
 | **N-2 without a predictor** | Both prediction-free policies lose to plain LRU at every size above 1 GB |
 | **PowerInfer neuron sparsity** | Needs ReLU's exact zeros; V4 uses SiLU |
 | **N-8 gate-first neuron skipping** | 2.49x in principle, **1.25x as stored** — `ffn_down_exps` is `[2048, 4096, 256]`, so neuron-skipping is a gather of 0.38-byte fragments |
+| **Saguaro-style fan-out** (hedge the read across F candidate next tokens) | The union across F candidates is the same size as the union across F *real consecutive* tokens (9.41 vs 9.29 experts/layer at 2), but hedging returns **one** token and batching returns **N**. Batching wins **2.03x at N=2, 7.70x at N=8** — the margin is exactly F |
 | Four biological analogies | Each reduced to something already in the design once stated without the metaphor |
 
 **The N-6 control is the point.** Without a random-matrix baseline, 0.0948 looks like a result.
 
-**Method:** `tools/expert_spectrum.py`, `tools/compress_test.py`.
-Results: `bench/results/expert_spectrum.csv`, `compress_test.csv`.
+**The fan-out kill has the same shape, one level up.** The measurement came back *positive* —
+hedging 8 ways costs 20.68 experts per layer against 44.24 for random draws and 48.00 for
+disjoint sets, so candidate futures genuinely do share most of their routing. It died because
+the baseline was wrong: the comparison that matters is not "better than random", it is "better
+than the boring option you already have".
+
+**Method:** `tools/expert_spectrum.py`, `tools/compress_test.py`, `tools/analyze_fanout.py`.
+Results: `bench/results/expert_spectrum.csv`, `compress_test.csv`, `fanout_analysis.txt`, `fanout_union.csv`.
 
 ---
 
@@ -364,3 +371,5 @@ Results: `bench/results/expert_spectrum.csv`, `compress_test.csv`.
 - **No claim about other models or quantizations.** Every number here is `UD-IQ1_S` of this model
   on this machine.
 - **No claim that N-2 works.** It is simulated, and the prediction-free versions of it failed.
+- **No claim that the fan-out numbers generalise.** Two prefixes, eight substitutions each,
+  prefill positions only. Enough to kill an idea, not enough to characterise the model.
